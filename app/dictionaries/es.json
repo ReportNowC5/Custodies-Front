@@ -1,0 +1,109 @@
+{
+  "dashboard": {
+    "title": "Panel de Control GPS",
+    "welcome": "Bienvenido de vuelta",
+    "overview": "Resumen",
+    "analytics": "Análisis",
+    "reports": "Reportes",
+    "settings": "Configuración"
+  },
+  "auth": {
+    "login": {
+      "title": "Iniciar Sesión",
+      "subtitle": "Ingresa tus credenciales para acceder al sistema GPS",
+      "email": "Correo Electrónico",
+      "password": "Contraseña",
+      "remember": "Recordarme",
+      "forgot": "¿Olvidaste tu contraseña?",
+      "signin": "Iniciar Sesión",
+      "welcome_back": "Bienvenido de vuelta",
+      "enter_credentials": "Ingresa tus credenciales"
+    },
+    "logout": "Cerrar Sesión",
+    "profile": "Perfil"
+  },
+  "users": {
+    "title": "Usuarios",
+    "list": "Lista de Usuarios",
+    "name": "Nombre",
+    "email": "Correo Electrónico",
+    "phone": "Teléfono",
+    "role": "Rol",
+    "status": "Estado",
+    "actions": "Acciones",
+    "add_user": "Agregar Usuario",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "view": "Ver",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "administrator": "Administrador",
+    "operator": "Operador",
+    "supervisor": "Supervisor"
+  },
+  "gps": {
+    "tracking": "Rastreo",
+    "vehicles": "Vehículos",
+    "routes": "Rutas",
+    "alerts": "Alertas",
+    "geofences": "Geocercas",
+    "reports": "Reportes",
+    "real_time": "Tiempo Real",
+    "history": "Historial",
+    "location": "Ubicación",
+    "speed": "Velocidad",
+    "status": "Estado"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "dashboard": "Panel",
+    "users": "Usuarios",
+    "vehicles": "Vehículos",
+    "reports": "Reportes",
+    "settings": "Configuración",
+    "help": "Ayuda",
+    "logout": "Salir"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "view": "Ver",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Advertencia",
+    "info": "Información",
+    "confirm": "Confirmar",
+    "yes": "Sí",
+    "no": "No",
+    "close": "Cerrar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "submit": "Enviar",
+    "reset": "Restablecer"
+  },
+  "errors": {
+    "generic": "Ha ocurrido un error inesperado",
+    "network": "Error de conexión de red",
+    "unauthorized": "No autorizado",
+    "forbidden": "Acceso denegado",
+    "not_found": "No encontrado",
+    "validation": "Error de validación",
+    "server": "Error del servidor"
+  },
+  "validation": {
+    "required": "Este campo es requerido",
+    "email": "Ingresa un correo electrónico válido",
+    "password": "La contraseña debe tener al menos 6 caracteres",
+    "phone": "Ingresa un número de teléfono válido",
+    "min_length": "Debe tener al menos {min} caracteres",
+    "max_length": "No debe exceder {max} caracteres"
+  }
+}
