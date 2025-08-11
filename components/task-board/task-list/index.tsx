@@ -36,7 +36,7 @@ const TaskList = ({ board, children, onEdit, length }: TaskListProps) => {
   async function onAction(id: string) {
     await deleteBoardAction(id);
   }
-  const { name, status, id } = board;
+  const { title, color, id } = board;
   return (
     <>
       <DeleteConfirmationDialog
@@ -46,9 +46,9 @@ const TaskList = ({ board, children, onEdit, length }: TaskListProps) => {
       />
       <div
         className={cn("border-l-2   rounded-l-xl mt-8", {
-          "border-l-primary": status === "primary",
-          "border-l-warning": status === "warning",
-          "border-l-success": status === "success",
+          "border-l-primary": color === "primary",
+          "border-l-warning": color === "warning",
+          "border-l-success": color === "success",
         })}
       >
         <div
@@ -68,7 +68,7 @@ const TaskList = ({ board, children, onEdit, length }: TaskListProps) => {
           </span>
 
           <span className="font-semibold text-default-800 capitalize flex-1">
-            {name} {length}
+            {title} {length}
           </span>
           <button type="button">
             {show ? (

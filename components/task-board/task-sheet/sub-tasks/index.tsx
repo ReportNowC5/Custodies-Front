@@ -17,9 +17,9 @@ const SubTasks = ({ subTasks, taskId }: {
   taskId: TaskType["id"];
 }) => {
   const [showComplete, setShowComplete] = useState<boolean>(false);
-  const filteredSubtasks = subTasks.filter((st) => st.taskId === taskId);
+  const filteredSubtasks = subTasks.filter((st) => st.parentTaskId === taskId);
   const completedSubtasks = filteredSubtasks.filter(
-    (taskItem) => taskItem.completed === true
+    (taskItem) => taskItem.status === "completed"
   );
 
   const handleShowCompleteTask = () => setShowComplete(!showComplete);
@@ -55,7 +55,7 @@ const SubTasks = ({ subTasks, taskId }: {
         </div>
         <div>
           {filteredSubtasks
-            .filter((taskItem) => !taskItem.completed)
+            .filter((taskItem) => taskItem.status !== "completed")
             .map((subtask) => (
               <TaskItem
                 subtask={subtask}

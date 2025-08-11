@@ -45,28 +45,26 @@ const SheetActions = ({ task, taskId }: {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {task?.assign?.length > 0 && (
+            {task?.assignee && (
               <AvatarGroup
                 countClass="w-5 h-5"
-                total={task?.assign?.length}
+                total={1}
                 max={3}
               >
-                {task?.assign?.map((member, i) => (
-                  <TooltipProvider key={`assign-member-task-${i}`}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Avatar className="w-5 h-5 ring-1 ring-background ring-offset-[2px]  ring-offset-background">
-                          <AvatarImage src={member.image.src} />
-                          <AvatarFallback></AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="py-[2px] px-1">
-                        <p className="text-xs font-medium">{member.name}</p>
-                        <TooltipArrow className=" fill-primary" />
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="w-5 h-5 ring-1 ring-background ring-offset-[2px]  ring-offset-background">
+                        <AvatarImage src={task.assignee.avatar} />
+                        <AvatarFallback></AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="py-[2px] px-1">
+                      <p className="text-xs font-medium">{task.assignee.name}</p>
+                      <TooltipArrow className=" fill-primary" />
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </AvatarGroup>
             )}
             <AssignMembers icon={<Plus className="w-3 h-3 text-primary" />} />

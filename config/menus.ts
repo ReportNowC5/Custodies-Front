@@ -9,6 +9,7 @@ export interface MenuItemProps {
   megaMenu?: MenuItemProps[];
   multi_menu?: MenuItemProps[];
   nested?: MenuItemProps[];
+  isHeader?: boolean;
   onClick?: () => void;
 }
 

@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { authService } from '@/lib/services/auth.service';
 import { User } from '@/lib/types/auth';
 
-interface AuthState {
+interface AuthState { 
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -85,9 +85,19 @@ export function useAuth(): UseAuthReturn {
       
       const response = await authService.login({ email, password, remember });
       
-      if (response.success && response.user) {
+      if (response.user && response.accessToken) {
         setState({
-          user: response.user,
+          user: {
+            id: response.user.id,
+            email: response.user.email,
+            name: response.user.name,
+            role: response.user.role,
+            avatar: response.user.avatar,
+            phone: '',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
           isLoading: false,
           isAuthenticated: true,
           error: null,
@@ -97,16 +107,15 @@ export function useAuth(): UseAuthReturn {
         setState(prev => ({
           ...prev,
           isLoading: false,
-          error: response.message || 'Error al iniciar sesión',
+          error: 'Error al iniciar sesión: respuesta inválida',
         }));
         return false;
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: 'Error al iniciar sesión',
+        error: error.message || 'Error al iniciar sesión',
       }));
       return false;
     }
@@ -138,10 +147,10 @@ export function useAuth(): UseAuthReturn {
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
       const response = await authService.refreshToken();
-      if (response.success && response.user) {
+      if (response.success && response.data) {
         setState(prev => ({
           ...prev,
-          user: response.user!,
+          user: response.data && 'user' in response.data ? response.data.user as User : null,
           isAuthenticated: true,
           error: null,
         }));

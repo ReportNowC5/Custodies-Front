@@ -9,7 +9,7 @@ interface DashboardProps {
 
 const ProjectPage = async ({ params: { lang } }: DashboardProps) => {
   const trans = await getDictionary(lang);
-  return <ProjectPageView trans={trans} />;
+  return <ProjectPageView trans={trans as { [key: string]: string }} />;
 };
 
 export default ProjectPage;

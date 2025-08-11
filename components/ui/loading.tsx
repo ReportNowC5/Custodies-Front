@@ -192,7 +192,7 @@ export function useLoading(initialState = false) {
   const stopLoading = useCallback(() => setIsLoading(false), []);
   const toggleLoading = useCallback(() => setIsLoading(prev => !prev), []);
 
-  const withLoading = useCallback(async <T>(asyncFn: () => Promise<T>): Promise<T> => {
+  const withLoading = useCallback(async <T,>(asyncFn: () => Promise<T>): Promise<T> => {
     startLoading();
     try {
       const result = await asyncFn();

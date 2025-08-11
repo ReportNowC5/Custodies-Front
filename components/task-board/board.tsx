@@ -57,7 +57,7 @@ const taskBoard = ({
   async function onAction(id: string) {
     await deleteBoardAction(id);
   }
-  const { name, status, id } = board;
+  const { title, color, id } = board;
 
   const {
     setNodeRef,
@@ -93,9 +93,9 @@ const taskBoard = ({
         className={cn(
           "max-w-[277px] border-t-4 rounded-md  flex-none w-full  shadow-lg bg-default-100 dark:bg-default-50 ",
           {
-            "border-primary": status === "primary",
-            "border-warning": status === "warning",
-            "border-success": status === "success",
+            "border-primary": color === "primary",
+            "border-warning": color === "warning",
+            "border-success": color === "success",
             "opacity-50": isDragging,
           }
         )}
@@ -114,7 +114,7 @@ const taskBoard = ({
             </Button>
           </div>
           <div className="text-sm font-semibold text-default-800 capitalize">
-            {name}
+            {title}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

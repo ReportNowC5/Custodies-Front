@@ -6,8 +6,9 @@ import { Icon } from "@iconify/react";
 import { type Contact as ContactType } from "@/app/api/chat/data";
 
 const ContactList = ({ contact }: { contact: ContactType }) => {
-  const { avatar, fullName, status, about, unreadmessage, date } =
-    contact;
+  const { avatar, name, status, email } = contact;
+  const unreadmessage = 0; // Default value
+  const date = 'now'; // Default value
 
   return (
     <div
@@ -19,8 +20,8 @@ const ContactList = ({ contact }: { contact: ContactType }) => {
       <div className="flex-1 flex gap-3">
         <div className="relative inline-block ">
           <Avatar>
-            <AvatarImage src={avatar?.src} />
-            <AvatarFallback>{fullName.slice(0, 2)}</AvatarFallback>
+            <AvatarImage src={avatar} />
+            <AvatarFallback>{name?.slice(0, 2)}</AvatarFallback>
           </Avatar>
           <Badge
             className=" h-2 w-2  p-0 ring-1 ring-border ring-offset-[1px]   items-center justify-center absolute
@@ -32,12 +33,12 @@ const ContactList = ({ contact }: { contact: ContactType }) => {
           <div className="truncate max-w-[120px]">
             <span className="text-sm text-default-900 font-medium">
               {" "}
-              {fullName}
+              {name}
             </span>
           </div>
           <div className="truncate  max-w-[120px]">
             <span className=" text-xs  text-default-600 ">
-              {about}
+              {email}
             </span>
           </div>
         </div>

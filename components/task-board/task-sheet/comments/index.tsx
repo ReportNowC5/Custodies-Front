@@ -13,7 +13,7 @@ const Comments = ({ className, comments, taskId }: {
   taskId?: TaskType["id"];
 }) => {
   const filteredComments =
-    comments?.filter((cm) => cm.subTaskId === taskId) || [];
+    comments?.filter((cm) => cm.postId === taskId) || [];
 
   const totalComments = filteredComments ? filteredComments.length : 0;
   let content = "comments";
@@ -48,24 +48,24 @@ const Comments = ({ className, comments, taskId }: {
                   <div className="flex gap-2" key={`comment-key-${comment.id}`}>
                     <div className="felx-none">
                       <Avatar>
-                        <AvatarImage src={comment.avatar} />
+                        <AvatarImage src={comment.author.avatar} />
                         <AvatarFallback>CS</AvatarFallback>
                       </Avatar>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-medium text-default-900 capitalize">
-                          {comment.name}
+                          {comment.author.name}
                         </div>
                         <div className="text-xs text-default-400">
-                          {comment.date}
+                          {comment.createdAt}
                         </div>
                         <div className="text-xs text-default-400">
                           <Check className="w-3 h-3" />
                         </div>
                       </div>
                       <div className="mt-1 text-default-600 font-medium ">
-                        {comment.text}
+                        {comment.content}
                       </div>
                     </div>
                   </div>

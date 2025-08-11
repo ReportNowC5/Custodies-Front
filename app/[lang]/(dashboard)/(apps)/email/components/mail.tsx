@@ -50,13 +50,13 @@ const Mail = ({
   const [isPending, startTransition] = React.useTransition();
 
   const filteredPrimaryMails = mails.filter(
-    (mail) => mail.category === "primary"
+    (mail) => mail.labels.includes("work") || mail.labels.includes("support")
   );
   const filteredSocialMails = mails.filter(
-    (mail) => mail.category === "social"
+    (mail) => mail.labels.includes("newsletter") || mail.labels.includes("industry")
   );
   const filteredPromotionsMails = mails.filter(
-    (mail) => mail.category === "promotions"
+    (mail) => mail.labels.includes("welcome") || mail.labels.includes("onboarding")
   );
 
   // mail state

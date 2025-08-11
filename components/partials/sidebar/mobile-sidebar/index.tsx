@@ -15,7 +15,7 @@ const MobileSidebar = ({ className, trans }: { className?: string, trans: any })
   const { sidebarBg, mobileMenu, setMobileMenu } = useSidebar();
   const [activeSubmenu, setActiveSubmenu] = useState<number | null>(null);
   const [activeMultiMenu, setMultiMenu] = useState<number | null>(null);
-  const menus = menusConfig?.sidebarNav?.classic || [];
+  const menus = menusConfig || [];
   const { collapsed } = useSidebar();
 
   const toggleSubmenu = (i: number) => {

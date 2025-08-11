@@ -26,9 +26,9 @@ export async function DELETE(request: NextRequest, response: any) {
 
   if (chatIndex !== -1) {
     const chat = chats[chatIndex];
-    if (index >= 0 && index < chat.chat.length) {
+    if (index >= 0 && index < chat.messages.length) {
       // Remove the message from the chat based on the received index
-      chat.chat.splice(index, 1);
+      chat.messages.splice(index, 1);
       return NextResponse.json(
         { message: "Message deleted successfully" },
         { status: 200 }

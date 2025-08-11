@@ -7,21 +7,21 @@ export async function POST(request: NextRequest, response: NextResponse) {
   let activeChat = chats.find((item) => item.id === parseInt(obj.contact.id));
 
   const newMessageData = {
-    message: obj.message,
-    time: new Date(),
-    senderId: 11,
-    replayMetadata: obj.replayMetadata,
+    id: Date.now().toString(),
+    text: obj.message,
+    sender: 'user',
+    timestamp: new Date().toISOString(),
+    read: false,
   };
   if (!activeChat) {
     activeChat = {
       id: obj.contact.id,
-      userId: obj.contact.id,
-      unseenMsgs: 0,
-      chat: [newMessageData],
+      contactId: obj.contact.id,
+      messages: [newMessageData],
     };
     chats.push(activeChat);
   } else {
-    activeChat.chat.push(newMessageData);
+    activeChat.messages.push(newMessageData);
   }
 
   return NextResponse.json(

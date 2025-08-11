@@ -52,13 +52,13 @@ const ForwardMessage = ({ open, contacts, setIsOpen }: {
                   <div className="flex-1 flex items-center gap-3">
                     <div className="relative inline-block ">
                       <Avatar>
-                        <AvatarImage src={contact.avatar?.src} />
-                        <AvatarFallback>{contact.fullName}</AvatarFallback>
+                        <AvatarImage src={contact.avatar} />
+                        <AvatarFallback>{contact.name?.slice(0, 2)}</AvatarFallback>
                       </Avatar>
                     </div>
                     <div>
                       <span className="text-sm text-default-900 font-medium">
-                        {contact.fullName}
+                        {contact.name}
                       </span>
                     </div>
                   </div>

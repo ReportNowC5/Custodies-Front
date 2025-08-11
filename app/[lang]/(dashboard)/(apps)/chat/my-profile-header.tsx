@@ -19,13 +19,13 @@ const MyProfileHeader = ({ profile }: { profile: ProfileUserType }) => {
       <div className="flex  justify-between mb-4">
         <div className="flex   gap-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={profile?.avatar.src} alt="" />
-            <AvatarFallback>{profile?.fullName.slice(0, 2)}</AvatarFallback>
+            <AvatarImage src={profile?.avatar} alt="" />
+            <AvatarFallback>{profile?.name?.slice(0, 2)}</AvatarFallback>
           </Avatar>
           <div className="block">
             <div className="text-sm font-medium text-default-900 ">
               <span className="relative before:h-1.5 before:w-1.5 before:rounded-full before:bg-success before:absolute before:top-1.5 before:-right-3">
-                {profile?.fullName}
+                {profile?.name}
               </span>
             </div>
             <span className="text-xs text-default-600">{profile?.bio}</span>

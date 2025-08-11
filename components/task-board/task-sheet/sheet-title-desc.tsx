@@ -59,7 +59,7 @@ const SheetTitleDesc = ({ task, taskId }: {
   React.useEffect(() => {
     if (task) {
       setValue("title", task.title);
-      setValue("desc", task.desc || "");
+      setValue("desc", task.description || "");
     }
   }, [task, setValue]);
   return (

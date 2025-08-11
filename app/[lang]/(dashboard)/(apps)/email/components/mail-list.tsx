@@ -14,7 +14,10 @@ export function MailList({ mail, handleSelectedMail }: {
   handleSelectedMail: (id: any) => void;
 }) {
 
-  const { id, name, label, text, starred } = mail;
+  const { id, from, subject, body, starred, labels } = mail;
+  const name = from.name;
+  const text = subject;
+  const label = labels[0] || 'default';
   const [isChecked, setIsChecked] = React.useState<boolean>(false);
   const [open, setOpen] = React.useState<boolean>(false);
 

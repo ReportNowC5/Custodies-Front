@@ -243,6 +243,15 @@ class ApiClient {
     const response = await this.client.post(url, formData, config);
     return response.data;
   }
+  
+  // Método específico para descargar archivos
+  public async downloadFile(url: string, config?: AxiosRequestConfig): Promise<Blob> {
+    const response = await this.client.get(url, {
+      ...config,
+      responseType: 'blob'
+    });
+    return response.data;
+  }
 }
 
 // Instancia singleton del cliente API

@@ -34,8 +34,8 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
   subtask: SubTaskType;
   handlerSubSheet: () => void;
 }) => {
-  const { completed, assignDate, id } = subtask;
-  const [isDone, setIsDone] = React.useState<boolean>(completed);
+  const { status, createdAt, id } = subtask;
+  const [isDone, setIsDone] = React.useState<boolean>(status === "completed");
   // update isComplete
   const [open, setOpen] = useState<boolean>(false);
 
@@ -43,7 +43,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
     try {
       const newData = {
         ...subtask,
-        completed: value,
+        status: value ? "completed" : "in-progress",
       };
 
       await updateSubTaskAction(id, newData);
@@ -67,7 +67,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
         className={cn(
           "flex gap-2 border-b border-dashed border-default-200 py-3 px-6 cursor-pointer",
           {
-            "bg-default-50": completed,
+            "bg-default-50": status === "completed",
           }
         )}
         onClick={handlerSubSheet}
@@ -85,29 +85,26 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
           <div className="flex">
             <div
               className={cn("flex-1 text-base font-medium text-default-900", {
-                "line-through": completed,
+                "line-through": status === "completed",
               })}
             >
               {subtask?.title}
             </div>
             <div className="flex-none flex items-center gap-2">
               {/* assigned members */}
-              {subtask?.assign?.length > 0 && (
+              {subtask?.assignee && (
                 <div>
                   <AvatarGroup
                     max={3}
-                    total={subtask.assign.length}
+                    total={1}
                     countClass="w-7 h-7"
                   >
-                    {subtask.assign?.map((user, i) => (
-                      <Avatar
-                        className=" ring-1 ring-background ring-offset-[2px]  ring-offset-background h-7 w-7"
-                        key={`avatar-key-${i}`}
-                      >
-                        <AvatarImage src={user.image} />
-                        <AvatarFallback>AB</AvatarFallback>
-                      </Avatar>
-                    ))}
+                    <Avatar
+                      className=" ring-1 ring-background ring-offset-[2px]  ring-offset-background h-7 w-7"
+                    >
+                      <AvatarImage src={subtask.assignee.avatar} />
+                      <AvatarFallback>AB</AvatarFallback>
+                    </Avatar>
                   </AvatarGroup>
                 </div>
               )}
@@ -133,7 +130,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-fit" align="end">
-                  {!completed && (
+                  {status !== "completed" && (
                     <>
                       <DropdownMenuItem className="gap-2">
                         <Icon
@@ -173,7 +170,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
             </div>
           </div>
           <div className="flex items-center gap-3 mt-3">
-            {completed ? (
+            {status === "completed" ? (
               <Badge
                 color="success"
                 variant="soft"
@@ -187,7 +184,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
                 variant="soft"
                 className="text-[10px] px-1 py-0 rounded leading-4 capitalize"
               >
-                {subtask.priority}
+                {status}
               </Badge>
             )}
 
@@ -196,7 +193,7 @@ const TaskItem = ({ subtask, handlerSubSheet }: {
                 icon="heroicons:calendar"
                 className="w-3.5 h-3.5 text-default-500"
               />
-              <span>{assignDate}</span>
+              <span>{createdAt}</span>
             </div>
           </div>
         </div>

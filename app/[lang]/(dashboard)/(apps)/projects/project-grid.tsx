@@ -59,11 +59,11 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
           <div className="flex-1">
             <Badge
               color={
-                project?.status === "review"
+                project?.status === "planning"
                   ? "warning"
                   : project?.status === "completed"
                     ? "success"
-                    : project?.status === "in progress"
+                    : project?.status === "active"
                       ? "default"
                       : "info"
               }
@@ -74,17 +74,10 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
             </Badge>
           </div>
           <div className="flex-none cursor-pointer">
-            {project?.isFavorite ? (
-              <Icon
-                icon="heroicons:star-solid"
-                className="text-yellow-400 w-[18px] h-[18px]"
-              />
-            ) : (
-              <Icon
-                icon="heroicons:star"
-                className="text-default-400 w-[18px] h-[18px]"
-              />
-            )}
+            <Icon
+              icon="heroicons:star"
+              className="text-default-400 w-[18px] h-[18px]"
+            />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -132,15 +125,15 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
             <div className="flex gap-2">
               <div>
                 <Avatar className="rounded h-12 w-12">
-                  <AvatarImage src={project?.logo?.src} alt="" />
+                  <AvatarImage src="/images/avatar/avatar-1.jpg" alt="" />
                   <AvatarFallback className="rounded uppercase bg-success/30 text-success">
-                    {project?.title?.slice(0, 2)}
+                    {project?.name?.slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
               </div>
               <div>
                 <div className="text-base font-semibold text-default-900 capitalize mb-1">
-                  {project?.title}
+                  {project?.name}
                 </div>
                 {project?.description && (
                   <div className="text-xs font-medium text-default-600 max-h-[34px]  overflow-hidden">
@@ -156,19 +149,19 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
               <div className="text-sm font-medium text-default-900 mb-3">
                 Team:
               </div>
-              {project?.assign?.length > 0 && (
+              {project?.team?.length > 0 && (
                 <div>
                   <AvatarGroup
                     max={3}
-                    total={project.assign.length}
+                    total={project.team.length}
                     countClass="h-7 w-7"
                   >
-                    {project.assign?.map((user, index) => (
+                    {project.team?.map((user, index) => (
                       <Avatar
                         className="ring-1 ring-background ring-offset-[2px]  ring-offset-background h-7 w-7 "
                         key={`assign-member-${index}`}
                       >
-                        <AvatarImage src={user?.image?.src} />
+                        <AvatarImage src={user?.avatar} />
                         <AvatarFallback>DC</AvatarFallback>
                       </Avatar>
                     ))}
@@ -198,10 +191,10 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
                 Project Progress:
               </span>
               <span className="text-xs font-medium text-default-600">
-                {project?.percentage ? project?.percentage : 0}%
+                {project?.progress ? project?.progress : 0}%
               </span>
             </div>
-            <Progress value={project?.percentage ? project?.percentage : 0} />
+            <Progress value={project?.progress ? project?.progress : 0} />
           </div>
         </CardContent>
         <CardFooter className="flex justify-between border-t  p-4">
@@ -210,13 +203,13 @@ const ProjectGrid = ({ project, onEdit }: ProjectGridProps) => {
               Assigned Date:
             </div>
             <span className="text-xs font-medium text-default-900">
-              {project?.assignDate}
+              {project?.startDate}
             </span>
           </div>
           <div>
             <div className="text-xs  text-default-600 mb-[2px]">Due Date:</div>
             <span className="text-xs font-medium text-default-900">
-              {project?.dueDate}
+              {project?.endDate}
             </span>
           </div>
         </CardFooter>

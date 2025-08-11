@@ -1,39 +1,5 @@
 import { apiClient } from '../api-client';
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-  remember?: boolean;
-}
-
-export interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    avatar?: string;
-  };
-  accessToken: string;
-  refreshToken: string;
-}
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  avatar?: string;
-  phone?: string;
-  status: 'active' | 'inactive';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface RefreshTokenResponse {
-  accessToken: string;
-  refreshToken: string;
-}
+import type { LoginCredentials, LoginResponse, User, RefreshTokenResponse } from '../types/auth';
 
 class AuthService {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -71,18 +37,18 @@ class AuthService {
     return response.data;
   }
 
-  async refreshToken(): Promise<RefreshTokenResponse> {
-    const response = await apiClient.post<RefreshTokenResponse>('/auth/refresh');
+  async refreshToken<T>(): Promise<RefreshTokenResponse<T>> {
+    const response = await apiClient.post<RefreshTokenResponse<T>>('/auth/refresh');
     
     // Actualizar tokens
-    if (response.data.accessToken && response.data.refreshToken) {
+    if (response.data && 'accessToken' in response.data && 'refreshToken' in response.data) {
       apiClient.setTokens({
-        accessToken: response.data.accessToken,
-        refreshToken: response.data.refreshToken,
+        accessToken: response.data.accessToken as string,
+        refreshToken: response.data.refreshToken as string,
       });
     }
     
-    return response.data;
+    return response.data as RefreshTokenResponse<T>;
   }
 
   async forgotPassword(email: string): Promise<void> {

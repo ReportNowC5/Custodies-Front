@@ -23,14 +23,7 @@ export function DataTableRowActions<TData>({ row }: DataTableRowActionsProps<TDa
     <div className="flex justify-end gap-3 items-center">
       <div>
 
-        {row?.original?.isFavorite ? (
-          <Icon
-            icon="heroicons:star-16-solid"
-            className="w-5 h-5 text-warning"
-          />
-        ) : (
-          <Icon icon="heroicons:star" className="w-5 h-5 text-default-500" />
-        )}
+        <Icon icon="heroicons:star" className="w-5 h-5 text-default-500" />
       </div>
 
       <DropdownMenu>

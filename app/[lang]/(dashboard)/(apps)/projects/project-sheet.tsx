@@ -147,14 +147,14 @@ const ProjectsSheet = ({ open, project, onClose, selectedId }: {
   };
 
   useEffect(() => {
-    setValue("title", project?.title || "");
+    setValue("title", project?.name || "");
     setValue("description", project?.description || "");
-    setValue("assign", project?.assign || []);
+    setValue("assign", project?.team || []);
     setValue("priority", project?.priority || "");
-    const parsedAssignDate = project?.assignDate
-      ? new Date(project.assignDate)
+    const parsedAssignDate = project?.startDate
+      ? new Date(project.startDate)
       : null;
-    const parsedDueDate = project?.dueDate ? new Date(project.dueDate) : null;
+    const parsedDueDate = project?.endDate ? new Date(project.endDate) : null;
     // Set state for startDate and endDate
     setStartDate(parsedAssignDate ?? new Date());
     setEndDate(parsedDueDate ?? new Date());

@@ -10,8 +10,12 @@ const ContactList = ({ contact, openChat, selectedChatId }: {
   openChat: (id: any) => void,
   selectedChatId: string
 }) => {
-  const { avatar, id, fullName, status, about, unreadmessage, date } =
-    contact;
+  const { avatar, id, name, status, email } = contact;
+  // Default values for missing properties
+  const fullName = name;
+  const about = email;
+  const unreadmessage = 0;
+  const date = new Date().toLocaleDateString();
 
   return (
     <div
@@ -26,9 +30,9 @@ const ContactList = ({ contact, openChat, selectedChatId }: {
       <div className="flex-1 flex  gap-3 ">
         <div className="relative inline-block ">
           <Avatar>
-            <AvatarImage src={avatar.src} />
+            <AvatarImage src={avatar} />
             <AvatarFallback className="uppercase">
-              {fullName.slice(0, 2)}
+              {name?.slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <Badge

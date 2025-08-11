@@ -48,7 +48,7 @@ export const columns: ColumnDef<Project, any>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "title",
+    accessorKey: "name",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Title" />
     ),
@@ -60,15 +60,15 @@ export const columns: ColumnDef<Project, any>[] = [
           }}
           className="flex items-center gap-2">
           <Avatar className="rounded-sm  h-8 w-8">
-            <AvatarImage src={row?.original?.logo?.src} />
+            <AvatarImage src="/images/avatar/avatar-1.jpg" />
             <AvatarFallback className="bg-success/30 text-success">
-              {row?.original?.title?.slice(0, 2)}
+              {row?.original?.name?.slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div className="max-w-[140px] truncate  ">
             <span className="font-semibold text-default-900 capitalize">
               {" "}
-              {row.getValue("title")}
+              {row.getValue("name")}
             </span>
           </div>
         </Link>
@@ -112,26 +112,22 @@ export const columns: ColumnDef<Project, any>[] = [
     },
   },
   {
-    accessorKey: "assign",
+    accessorKey: "team",
     header: "Team",
     cell: ({ row }) => {
       return (
         <>
           <AvatarGroup
             max={3}
-            total={row?.original?.assign?.length}
+            total={row?.original?.team?.length}
             countClass="w-7 h-7"
           >
-            {row?.original?.assign?.map((item, i) => (
+            {row?.original?.team?.map((item: { avatar: string }, i: number) => (
               <div key={`assined-team-member-${i}`}>
-                {typeof item === "object" ? (
-                  <Avatar className=" ring-1 ring-background ring-offset-[2px]  ring-offset-background h-7 w-7">
-                    <AvatarImage src={item?.image?.src} />
-                    <AvatarFallback>AB</AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <div>{item}</div>
-                )}
+                <Avatar className=" ring-1 ring-background ring-offset-[2px]  ring-offset-background h-7 w-7">
+                  <AvatarImage src={item?.avatar} />
+                  <AvatarFallback>AB</AvatarFallback>
+                </Avatar>
               </div>
             ))}
           </AvatarGroup>
@@ -140,15 +136,15 @@ export const columns: ColumnDef<Project, any>[] = [
     },
   },
   {
-    accessorKey: "percentage",
+    accessorKey: "progress",
     header: "Progress",
     cell: ({ row }) => {
       return (
         <div className="min-w-[190px]">
           <div className="flex justify-end mb-2">
-            <Label className="text-end">{row.getValue("percentage")}%</Label>
+            <Label className="text-end">{row.getValue("progress")}%</Label>
           </div>
-          <Progress value={row.getValue("percentage")} size="sm" />
+          <Progress value={row.getValue("progress")} size="sm" />
         </div>
       );
     },
@@ -185,12 +181,12 @@ export const columns: ColumnDef<Project, any>[] = [
     },
   },
   {
-    accessorKey: "dueDate",
+    accessorKey: "endDate",
     header: "Due Date",
     cell: ({ row }) => {
       return (
         <div className="text-sm font-medium text-default-600 whitespace-nowrap">
-          {row.getValue("dueDate")}
+          {row.getValue("endDate")}
         </div>
       );
     },

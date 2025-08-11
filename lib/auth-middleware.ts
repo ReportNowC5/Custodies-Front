@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { jwtVerify, type JWTPayload as JoseJWTPayload } from 'jose';
 
 // Rutas que requieren autenticación
 const protectedRoutes = [
@@ -32,7 +32,8 @@ const supervisorRoutes = [
   '/gps/users',
 ];
 
-interface JWTPayload {
+// Renombrar la interfaz local para evitar conflictos
+interface CustomJWTPayload extends JoseJWTPayload {
   sub: string;
   email: string;
   role: string;
@@ -85,10 +86,10 @@ export class AuthMiddleware {
   /**
    * Verifica y decodifica el JWT token
    */
-  static async verifyToken(token: string): Promise<JWTPayload | null> {
+  static async verifyToken(token: string): Promise<CustomJWTPayload | null> {
     try {
       const { payload } = await jwtVerify(token, this.JWT_SECRET);
-      return payload as JWTPayload;
+      return payload as CustomJWTPayload;
     } catch (error) {
       console.error('JWT verification failed:', error);
       return null;
@@ -183,7 +184,7 @@ export class AuthMiddleware {
    */
   static async authenticateAPI(request: NextRequest): Promise<{
     success: boolean;
-    user?: JWTPayload;
+    user?: CustomJWTPayload;
     response?: NextResponse;
   }> {
     const token = this.getTokenFromRequest(request);
@@ -230,7 +231,7 @@ export class AuthMiddleware {
    * Verifica permisos específicos para API
    */
   static checkAPIPermissions(
-    user: JWTPayload,
+    user: CustomJWTPayload,
     requiredRole?: string,
     requiredPermissions?: string[]
   ): boolean {

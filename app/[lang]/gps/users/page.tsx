@@ -400,7 +400,7 @@ const UsersPageContent = ({ params }: UsersPageProps) => {
                 return (
                   <Button
                     key={page}
-                    variant={currentPage === page ? "default" : "outline"}
+                    variant={currentPage === page ? "ghost" : "outline"}
                     size="sm"
                     onClick={() => handlePageChange(page)}
                     className={currentPage === page ? "bg-purple-600 hover:bg-purple-700" : ""}

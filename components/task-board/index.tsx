@@ -110,8 +110,12 @@ const TaskBoard = ({ boards, tasks, subTasks, comments }: TaskBoardProps) => {
   };
 
   const filteredTasks = (tasks: TaskType[], boardId: BoardType["id"]) => {
-    // Add your filtering logic here
-    return tasks?.filter((task) => task.boardId === boardId);
+    // Since tasks don't have boardId, return tasks based on status or distribute evenly
+    const boardIndex = boards.findIndex(board => board.id === boardId);
+    const tasksPerBoard = Math.ceil(tasks.length / boards.length);
+    const startIndex = boardIndex * tasksPerBoard;
+    const endIndex = startIndex + tasksPerBoard;
+    return tasks.slice(startIndex, endIndex);
   };
   // dnd
   const [isPending, startTransition] = React.useTransition();
@@ -197,9 +201,7 @@ const TaskBoard = ({ boards, tasks, subTasks, comments }: TaskBoardProps) => {
                           showButton={
                             !open2 || selectedBoardForTask !== board.id
                           }
-                          tasks={tasks.filter(
-                            (task) => task.boardId === board.id
-                          )}
+                          tasks={filteredTasks(tasks, board.id)}
                           onUpdateTask={updateTaskHandler}
                           boards={boards}
                         >

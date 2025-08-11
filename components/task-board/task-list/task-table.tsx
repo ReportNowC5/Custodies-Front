@@ -148,7 +148,7 @@ const TaskTable = ({ data, boards, onUpdateTask, boardID2 }: TaskTableProps) => 
   const [isPending, startTransition] = React.useTransition();
   const getBoardNameById = (boardId: BoardType["id"]) => {
     const foundBoard = boards.find((board) => board.id === boardId);
-    return foundBoard ? foundBoard.name : "Unknown Board";
+    return foundBoard ? foundBoard.title : "Unknown Board";
   };
   const handleMoveTask = (task: TaskType, boardId: BoardType["id"]) => {
     const newData = {
@@ -238,7 +238,7 @@ const TaskTable = ({ data, boards, onUpdateTask, boardID2 }: TaskTableProps) => 
                 variant="soft"
                 className="flex items-center gap-1 text-sm font-medium  h-6 whitespace-nowrap"
               >
-                {getBoardNameById(row?.original.boardId)}{" "}
+                {getBoardNameById(boardID2)}{" "}
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -249,7 +249,7 @@ const TaskTable = ({ data, boards, onUpdateTask, boardID2 }: TaskTableProps) => 
                   className="text-[10px] leading-[14px] font-semibold  text-default-600 py-1"
                   key={`key-dropdown-${board.id}`}
                 >
-                  {board.name}
+                  {board.title}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -437,7 +437,7 @@ const TaskTable = ({ data, boards, onUpdateTask, boardID2 }: TaskTableProps) => 
 
                 className="font-medium text-default-600 bg-transparent hover:bg-transparent whitespace-nowrap"
               >
-                {row.getValue("date")} /{row?.original?.time}
+                {row.getValue("date")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0" side="bottom">

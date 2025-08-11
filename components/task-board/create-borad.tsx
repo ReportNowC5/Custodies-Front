@@ -23,8 +23,8 @@ import { X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { type Board as BoardType } from "@/app/api/boards/data";
 const schema = z.object({
-  name: z.string().min(2, { message: "Your email is invalid." }),
-  status: z.string().optional(),
+  title: z.string().min(2, { message: "Title is required." }),
+  color: z.string().optional(),
 });
 interface CreateBoardProps {
   open: boolean;
@@ -51,8 +51,8 @@ const CreateBoard = ({ open, onClose, board, boardId }: CreateBoardProps) => {
   const onSubmit = (data: any) => {
     const updatedData = {
       ...board,
-      name: data.name,
-      status: data.status,
+      title: data.title,
+      color: data.color,
     };
     var result;
     if (board) {
@@ -72,8 +72,8 @@ const CreateBoard = ({ open, onClose, board, boardId }: CreateBoardProps) => {
     reset();
   };
   React.useEffect(() => {
-    setValue("name", board?.name || "");
-    setValue("status", board?.status || "defaultStatus");
+    setValue("title", board?.title || "");
+    setValue("color", board?.color || "#6338f0");
   }, [open]);
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -97,10 +97,10 @@ const CreateBoard = ({ open, onClose, board, boardId }: CreateBoardProps) => {
               </Label>
               <Input
                 type="text"
-                {...register("name")}
+                {...register("title")}
                 id="boardName"
                 className={cn("", {
-                  "border-destructive focus:border-destructive": errors.name,
+                  "border-destructive focus:border-destructive": errors.title,
                 })}
               />
             </div>
@@ -110,7 +110,7 @@ const CreateBoard = ({ open, onClose, board, boardId }: CreateBoardProps) => {
               </Label>
               <Input
                 type="color"
-                name="status"
+                {...register("color")}
                 className="p-0 border-none rounded-md"
                 defaultValue="#6338f0"
               />

@@ -77,17 +77,10 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
     id,
     tags,
     title,
-    desc,
+    description,
     priority,
     status,
-    assign,
-    image,
-    category,
-    pages,
-    messageCount,
-    link,
-    date,
-    time,
+    assignee,
   } = task;
 
   const handleMoveTask = (task: TaskType, boardId: BoardType["id"]) => {
@@ -100,7 +93,7 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
 
   const getBoardNameById = (boardId: BoardType["id"]) => {
     const foundBoard = boards.find((board: BoardType) => board.id === boardId);
-    return foundBoard ? foundBoard.name : "Unknown Board";
+    return foundBoard ? foundBoard.title : "Unknown Board";
   };
   // delete task
   const onAction = async (dltId: string) => {
@@ -156,7 +149,7 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <div className="text-[10px] leading-[14px] font-semibold  text-default-600 border border-default-200 px-1.5  rounded-sm flex justify-center items-center gap-[2px]">
-                    {getBoardNameById(task.boardId)}
+                    Board
                     <ChevronDown className="w-3 h-3" />
                   </div>
                 </DropdownMenuTrigger>
@@ -167,7 +160,7 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
                       className="text-[10px] leading-[14px] font-semibold  text-default-600 py-1"
                       key={`key-dropdown-${board.id}`}
                     >
-                      {board.name}
+                      {board.title}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -204,19 +197,8 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
               {title}
             </div>
           </div>
-          <div className="text-[13px] text-default-500">{desc}</div>
-          {image && (
-            <div className="w-full mt-3 rounded">
-              <Image
-                alt=""
-                src={image}
+          <div className="text-[13px] text-default-500">{description}</div>
 
-                className=" rounded"
-                height={190}
-                width={277}
-              />
-            </div>
-          )}
 
           <div className="flex flex-wrap items-center gap-1 mt-2">
             <Badge
@@ -240,24 +222,22 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
             <div onClick={(e) => e.stopPropagation()}>
               <AssignMembers icon={null} />
             </div>
-            {assign?.length > 0 && (
-              <AvatarGroup total={assign?.length} max={3} countClass="w-5 h-5">
-                {assign?.map((member, i) => (
-                  <TooltipProvider key={`assign-member-task-${i}`}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Avatar className="w-5 h-5 ring-1 ring-background ring-offset-[2px]  ring-offset-background">
-                          <AvatarImage src={member.image.src} />
-                          <AvatarFallback></AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="py-[2px] px-1">
-                        <p className="text-xs font-medium">{member.name}</p>
-                        <TooltipArrow className=" fill-primary" />
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
+            {assignee && (
+              <AvatarGroup total={1} max={3} countClass="w-5 h-5">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="w-5 h-5 ring-1 ring-background ring-offset-[2px]  ring-offset-background">
+                        <AvatarImage src={assignee.avatar} />
+                        <AvatarFallback></AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="py-[2px] px-1">
+                      <p className="text-xs font-medium">{assignee.name}</p>
+                      <TooltipArrow className=" fill-primary" />
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </AvatarGroup>
             )}
           </div>
@@ -266,7 +246,7 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
           <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-1 text-xs text-default-600">
               <List className="w-3.5 h-3.5 text-default-500" />
-              {category}
+              Task
             </div>
             <div
               className="flex items-center gap-1 text-xs text-default-600"
@@ -281,18 +261,18 @@ const Task = ({ task, onUpdateTask, boards }: TaskProps) => {
                 icon="heroicons:chat-bubble-oval-left-ellipsis"
                 className="w-3.5 h-3.5 text-default-500"
               />
-              {messageCount}
+              0
             </div>
             <div className="flex items-center gap-1 text-xs text-default-600">
               <Link className="w-2.5 h-2.5 text-default-500" />
-              {link}
+              0
             </div>
             <div
               className="flex items-center gap-1 text-xs text-default-600"
               onClick={(e) => e.stopPropagation()}
             >
               <Calendar className="w-3.5 h-3.5 text-default-500" />
-              {date} / {time}
+              {new Date(task.createdAt).toLocaleDateString()} / {new Date(task.createdAt).toLocaleTimeString()}
             </div>
           </div>
         </CardFooter>

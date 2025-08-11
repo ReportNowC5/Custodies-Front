@@ -202,7 +202,7 @@ const BarsWithMarkes = ({ height = 350 }) => {
   return (
       <Chart
         options={options}
-        series={series}
+        series={series as any}
         type="bar"
         height={height}
         width={"100%"}
