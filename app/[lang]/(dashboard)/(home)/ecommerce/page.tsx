@@ -8,7 +8,7 @@ interface DashboardProps {
 }
 const EcommercePage = async ({ params: { lang } }: DashboardProps) => {
   const trans = await getDictionary(lang);
-  return <EcommercePageView trans={trans as { [key: string]: string }} />;
+  return <EcommercePageView trans={trans} />;
 };
 
 export default EcommercePage;

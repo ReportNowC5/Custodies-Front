@@ -14,7 +14,7 @@ import DatePickerWithRange from "@/components/date-picker-with-range";
 
 interface DashboardPageViewProps {
   trans: {
-    [key: string]: string;
+    [key: string]: any;
   };
 }
 const DashboardPageView = ({ trans }: DashboardPageViewProps) => {
@@ -22,7 +22,7 @@ const DashboardPageView = ({ trans }: DashboardPageViewProps) => {
     <div className="space-y-6">
       <div className="flex items-center flex-wrap justify-between gap-4">
         <div className="text-2xl font-medium text-default-800 ">
-          Analytics {trans?.dashboard}
+          {String(trans?.dashboard?.analytics || trans?.analytics || 'Analytics')}
         </div>
         <DatePickerWithRange />
       </div>

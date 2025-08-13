@@ -1,5 +1,6 @@
+"use client";
 import React from "react";
-
+import { Icon } from "@iconify/react";
 import { Badge } from "@/components/ui/badge";
 import { cn, isLocationMatch, translate, getDynamicPath } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -30,7 +31,7 @@ const SingleMenuItem = ({ item, collapsed, hovered, trans }: {
             )}
           >
             <span className="flex-grow-0">
-              <item.icon className="w-5 h-5  " />
+              <Icon icon={item.icon} className="w-5 h-5  " />
             </span>
             <div className="text-box flex-grow">{translate(title, trans)}</div>
             {badge && <Badge className=" rounded">{item.badge}</Badge>}

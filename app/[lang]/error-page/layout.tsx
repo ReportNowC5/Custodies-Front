@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Error Page",
+  title: "Página de Error",
 };
 const Layout = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;

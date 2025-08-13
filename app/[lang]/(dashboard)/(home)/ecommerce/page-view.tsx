@@ -18,7 +18,7 @@ import DashboardDropdown from "@/components/dashboard-dropdown";
 import DatePickerWithRange from "@/components/date-picker-with-range";
 interface EcommercePageViewProps {
   trans: {
-    [key: string]: string;
+    [key: string]: any;
   };
 }
 const EcommercePageView = ({ trans }:EcommercePageViewProps) => {

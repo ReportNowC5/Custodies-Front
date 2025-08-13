@@ -1,41 +1,48 @@
-import { NextResponse,  NextRequest} from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { demoBoards } from "./data";
+import { createSuccessResponse, createCreatedResponse, createErrorResponse, handleApiError } from "@/lib/api-helpers";
+
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, response: NextResponse) {
-  return NextResponse.json(demoBoards, { status: 200 });
+export async function GET(request: NextRequest) {
+    try {
+        return createSuccessResponse(demoBoards, "Boards obtenidos exitosamente", request.url);
+    } catch (error) {
+        return handleApiError(error, request.url);
+    }
 }
 
-export async function POST(request: NextRequest, response: NextResponse) {
-  const newItem = await request.json();
-  newItem.id = demoBoards.length + 1;
-  demoBoards.push(newItem);
+export async function POST(request: NextRequest) {
+    try {
+        const newItem = await request.json();
+        newItem.id = demoBoards.length + 1;
+        demoBoards.push(newItem);
 
-  return NextResponse.json(newItem, { status: 201 });
+        return createCreatedResponse(newItem, "Board creado exitosamente", request.url);
+    } catch (error) {
+        return handleApiError(error, request.url, "Error al crear board");
+    }
 }
 
-export async function PATCH(request: NextRequest, response: any) {
-  const payloadItem = await request.json();
-  const { activeBoardId, overBoardId } = payloadItem;
+export async function PATCH(request: NextRequest) {
+    try {
+        const payloadItem = await request.json();
+        const { activeBoardId, overBoardId } = payloadItem;
 
-  const activeIndex = demoBoards.findIndex(
-    (item) => item.id === activeBoardId
-  );
-  const overIndex = demoBoards.findIndex(
-    (item) => item.id === overBoardId
-  );
-  if (activeIndex !== -1 && overIndex !== -1) {
-    // // swap boards
-    [demoBoards[activeIndex], demoBoards[overIndex]] = [
-      demoBoards[overIndex],
-      demoBoards[activeIndex],
-    ];
+        const activeIndex = demoBoards.findIndex((item) => item.id === activeBoardId);
+        const overIndex = demoBoards.findIndex((item) => item.id === overBoardId);
 
-    return NextResponse.json(
-      { message: "Item updated successfully" },
-      { status: 200 }
-    );
-  } else {
-    return NextResponse.json({ message: "Item not found" }, { status: 404 });
-  }
+        if (activeIndex !== -1 && overIndex !== -1) {
+            [demoBoards[activeIndex], demoBoards[overIndex]] = [
+                demoBoards[overIndex],
+                demoBoards[activeIndex],
+            ];
+
+            return createSuccessResponse([], "Boards reordenados exitosamente", request.url);
+        } else {
+            return createErrorResponse("Board no encontrado", 404, "BOARD_NOT_FOUND", request.url);
+        }
+    } catch (error) {
+        return handleApiError(error, request.url, "Error al reordenar boards");
+    }
 }

@@ -8,7 +8,7 @@ interface DashboardProps {
 }
 const Dashboard = async ({ params: { lang } }: DashboardProps) => {
   const trans = await getDictionary(lang);
-  return <DashboardPageView trans={trans as { [key: string]: string }} />;
+  return <DashboardPageView trans={trans} />;
 };
 
 export default Dashboard;

@@ -1,5 +1,12 @@
 {
-  "dashboard": "dashboard",
+  "dashboard": {
+    "title": "GPS Control Panel",
+    "welcome": "Welcome back",
+    "overview": "Overview",
+    "analytics": "Analytics",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
   "analytics": "analytics",
   "ecommerce": "ecommerce",
   "project": "project",

@@ -7,6 +7,27 @@
     "reports": "Reportes",
     "settings": "Configuración"
   },
+  "analytics": {
+    "title": "Análisis",
+    "overview": "Resumen Analítico",
+    "performance": "Rendimiento",
+    "trends": "Tendencias",
+    "insights": "Perspectivas"
+  },
+  "reports": {
+    "title": "Reportes",
+    "generate": "Generar Reporte",
+    "export": "Exportar",
+    "schedule": "Programar",
+    "history": "Historial"
+  },
+  "settings": {
+    "title": "Configuración",
+    "general": "General",
+    "security": "Seguridad",
+    "notifications": "Notificaciones",
+    "preferences": "Preferencias"
+  },
   "auth": {
     "login": {
       "title": "Iniciar Sesión",

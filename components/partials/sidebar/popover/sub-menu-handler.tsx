@@ -31,7 +31,7 @@ const SubMenuHandler = ({
         <HoverCard.Root>
           <HoverCard.Trigger asChild>
             <div className="inline-flex cursor-pointer items-center justify-center data-[state=open]:bg-primary-100 data-[state=open]:text-primary  w-12 h-12  rounded-md">
-              <item.icon className="w-6 h-6" />
+              <Icon icon={item.icon} className="w-6 h-6" />
             </div>
           </HoverCard.Trigger>
           <HoverCard.Portal>

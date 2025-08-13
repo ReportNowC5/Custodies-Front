@@ -1,102 +1,110 @@
-import { apiClient } from '../api-client';
-import type { LoginCredentials, LoginResponse, User, RefreshTokenResponse } from '../types/auth';
+import { LoginCredentials, AuthResponse, User } from '@/lib/types/auth';
+import apiClient from '@/lib/api-client';
+import { env } from '@/lib/config/environment';
 
 class AuthService {
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    try {
-      const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
-      
-      // Guardar tokens
-      if (response.data.accessToken && response.data.refreshToken) {
-        apiClient.setTokens({
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
-        });
-      }
-      
-      return response.data;
-    } catch (error) {
-      throw error;
+    private readonly TOKEN_KEY = 'auth_token';
+    private readonly USER_KEY = 'auth_user';
+
+    private setCookie(name: string, value: string, days: number = 7) {
+        if (typeof window !== 'undefined') {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+        }
     }
-  }
 
-  async logout(): Promise<void> {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (error) {
-      // Continuar con el logout local incluso si falla el servidor
-      console.error('Error during server logout:', error);
-    } finally {
-      // Limpiar tokens locales
-      apiClient.clearTokens();
+    private deleteCookie(name: string) {
+        if (typeof window !== 'undefined') {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+        }
     }
-  }
 
-  async getCurrentUser(): Promise<User> {
-    const response = await apiClient.get<User>('/auth/me');
-    return response.data;
-  }
-
-  async refreshToken<T>(): Promise<RefreshTokenResponse<T>> {
-    const response = await apiClient.post<RefreshTokenResponse<T>>('/auth/refresh');
-    
-    // Actualizar tokens
-    if (response.data && 'accessToken' in response.data && 'refreshToken' in response.data) {
-      apiClient.setTokens({
-        accessToken: response.data.accessToken as string,
-        refreshToken: response.data.refreshToken as string,
-      });
+    async login(credentials: LoginCredentials): Promise<AuthResponse<User>> {
+        try {
+            console.log('🔐 Intentando login...');
+            
+            const response = await apiClient.post<any>('/api/auth/login', {
+                email: credentials.email,
+                password: credentials.password
+            });
+            
+            console.log('📥 Respuesta del login:', response);
+            
+            if (response.success && response.result) {
+                const token = response.result.token;
+                const user = response.result.user || { email: credentials.email };
+                
+                // Guardar tokens
+                apiClient.setTokens({
+                    accessToken: token,
+                    refreshToken: token // Usar el mismo token por ahora
+                });
+                
+                // Guardar en localStorage y cookies
+                localStorage.setItem(this.TOKEN_KEY, token);
+                localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+                this.setCookie(this.TOKEN_KEY, token);
+                
+                console.log('✅ Login exitoso');
+                
+                return {
+                    success: true,
+                    result: user,
+                    message: 'Login exitoso'
+                };
+            } else {
+                throw new Error(response.message || 'Error en el login');
+            }
+        } catch (error: any) {
+            console.error('💥 Error en login:', error);
+            throw error;
+        }
     }
-    
-    return response.data as RefreshTokenResponse<T>;
-  }
 
-  async forgotPassword(email: string): Promise<void> {
-    await apiClient.post('/auth/forgot-password', { email });
-  }
+    logout(): void {
+        console.log('🚪 Cerrando sesión...');
+        
+        if (typeof window !== 'undefined') {
+            // Limpiar todo
+            apiClient.clearTokens();
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Limpiar cookies
+            this.deleteCookie(this.TOKEN_KEY);
+            this.deleteCookie('auth_token');
+            
+            console.log('✅ Sesión cerrada');
+            
+            // Redireccionar
+            window.location.replace('/auth/login');
+        }
+    }
 
-  async resetPassword(token: string, password: string): Promise<void> {
-    await apiClient.post('/auth/reset-password', { token, password });
-  }
+    getCurrentUser(): User | null {
+        try {
+            if (typeof window !== 'undefined') {
+                const userStr = localStorage.getItem(this.USER_KEY);
+                return userStr ? JSON.parse(userStr) : null;
+            }
+        } catch (error) {
+            console.error('Error obteniendo usuario:', error);
+        }
+        return null;
+    }
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await apiClient.post('/auth/change-password', {
-      currentPassword,
-      newPassword,
-    });
-  }
+    getToken(): string | null {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem(this.TOKEN_KEY);
+        }
+        return null;
+    }
 
-  async updateProfile(data: Partial<User>): Promise<User> {
-    const response = await apiClient.put<User>('/auth/profile', data);
-    return response.data;
-  }
-
-  // Verificar si el usuario está autenticado
-  isAuthenticated(): boolean {
-    if (typeof window === 'undefined') return false;
-    const token = localStorage.getItem('accessToken');
-    return !!token;
-  }
-
-  // Obtener el token actual
-  getAccessToken(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('accessToken');
-  }
-
-  // Verificar permisos del usuario
-  hasPermission(permission: string): boolean {
-    // Implementar lógica de permisos basada en el rol del usuario
-    // Por ahora, retornamos true para simplificar
-    return true;
-  }
-
-  // Verificar si el usuario tiene un rol específico
-  hasRole(role: string): boolean {
-    // Implementar lógica de roles
-    // Por ahora, retornamos true para simplificar
-    return true;
-  }
+    isAuthenticated(): boolean {
+        const token = this.getToken();
+        return !!token;
+    }
 }
 
 export const authService = new AuthService();

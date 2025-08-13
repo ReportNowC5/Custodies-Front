@@ -141,7 +141,8 @@ class UsersService {
     const queryString = params.toString();
     const url = queryString ? `/users/export?${queryString}` : '/users/export';
     
-    return await apiClient.downloadFile(url);
+    const response = await apiClient.downloadFile(url);
+    return new Blob([response.data as BlobPart]);
   }
 
   async importUsers(file: File): Promise<{

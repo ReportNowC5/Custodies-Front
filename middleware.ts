@@ -1,75 +1,127 @@
 import { NextRequest, NextResponse } from "next/server";
 import { match } from "@formatjs/intl-localematcher";
 import Negotiator from "negotiator";
-import { AuthMiddleware } from "./lib/auth-middleware";
 
-// Solo soportar inglés y español
 const locales = ["en", "es"];
 const defaultLocale = "es";
 
-function getLocale(request: NextRequest) {
+function getLocale(request: NextRequest): string {
     const acceptedLanguage = request.headers.get("accept-language") ?? undefined;
     const headers = { "accept-language": acceptedLanguage };
     const languages = new Negotiator({ headers }).languages();
-    return match(languages, locales, defaultLocale);
+    try {
+        return match(languages, locales, defaultLocale);
+    } catch (e) {
+        return defaultLocale;
+    }
 }
 
-export async function middleware(request: NextRequest) {
+const protectedRoutes = [
+    '/dashboard',
+    '/projects',
+    '/tasks',
+    '/boards',
+    '/calendars',
+    '/email',
+    '/gps',
+    '/utility',
+    '/customers'  // Agregar esta línea
+];
+
+const publicRoutes = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/error-page'
+];
+
+function isProtectedRoute(pathname: string): boolean {
+    return protectedRoutes.some(route => pathname.startsWith(route));
+}
+
+function isPublicRoute(pathname: string): boolean {
+    return publicRoutes.some(route => pathname.startsWith(route));
+}
+
+function isAuthenticated(request: NextRequest): boolean {
+    // Verificar token en cookies
+    const cookieToken = request.cookies.get('auth_token')?.value;
+    
+    // También verificar en headers Authorization (para requests con token)
+    const authHeader = request.headers.get('authorization');
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+    const token = cookieToken || headerToken;
+
+    if (!token) {
+        return false;
+    }
+
+    // Validación más estricta del token
+    try {
+        // Verificar que el token no esté vacío y tenga un formato mínimo válido
+        if (token.length < 10) {
+            return false;
+        }
+        
+        // Verificar que no sea un token obviamente inválido
+        if (token === 'null' || token === 'undefined' || token === '') {
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error validating token:', error);
+        return false;
+    }
+}
+
+export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
+    const isAuth = isAuthenticated(request);
 
-    // Excluir rutas de NextAuth.js del middleware de internacionalización
-    if (pathname.startsWith('/api/auth/')) {
-        return NextResponse.next();
-    }
-
-    // Excluir assets estáticos (imágenes, archivos, etc.)
-    if (pathname.startsWith('/images/') || 
-        pathname.startsWith('/files/') || 
-        pathname.startsWith('/icons/') || 
-        pathname.startsWith('/assets/') ||
-        pathname.includes('.')) {
-        return NextResponse.next();
-    }
-
-    // Verificar autenticación primero para rutas protegidas
-    const authResponse = await AuthMiddleware.authenticate(request);
-    if (authResponse) {
-        return authResponse;
-    }
-
-    // Check if there is any supported locale in the pathname
+    // Si ya tiene locale, manejar lógica de autenticación
     const pathnameHasLocale = locales.some(
         (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
     );
 
-    // Redirect if there is no locale
-    if (!pathnameHasLocale) {
-        const locale = getLocale(request);
-        request.nextUrl.pathname = `/${locale}${pathname}`;
-        // e.g. incoming request is /products
-        // The new URL is now /es/products
-        return NextResponse.redirect(request.nextUrl);
-    }
+    if (pathnameHasLocale) {
+        const locale = pathname.split('/')[1];
+        const routeWithoutLocale = '/' + pathname.split('/').slice(2).join('/');
 
-    // Rate limiting para API routes
-    if (pathname.startsWith('/api/')) {
-        const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-        if (!AuthMiddleware.checkRateLimit(clientIP, 100, 60000)) {
-            return NextResponse.json(
-                { error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.' },
-                { status: 429 }
-            );
+        // Si está autenticado y accede a rutas públicas, redirigir al dashboard
+        if (isPublicRoute(routeWithoutLocale) && isAuth) {
+            return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
         }
+
+        // Si no está autenticado y accede a rutas protegidas, redirigir al login
+        if (isProtectedRoute(routeWithoutLocale) && !isAuth) {
+            return NextResponse.redirect(new URL(`/${locale}/auth/login`, request.url));
+        }
+
+        return NextResponse.next();
     }
 
-    return NextResponse.next();
+    // Para rutas sin locale, añadir locale y manejar autenticación
+    const locale = getLocale(request);
+
+    // Si está autenticado y accede a rutas públicas, redirigir al dashboard con locale
+    if (isPublicRoute(pathname) && isAuth) {
+        return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+    }
+
+    // Si no está autenticado y accede a rutas protegidas, redirigir al login con locale
+    if (isProtectedRoute(pathname) && !isAuth) {
+        return NextResponse.redirect(new URL(`/${locale}/auth/login`, request.url));
+    }
+
+    // Añadir locale a la ruta
+    return NextResponse.redirect(new URL(`/${locale}${pathname}`, request.url));
 }
 
 export const config = {
     matcher: [
-        // Skip all internal paths (_next), static assets, and auth API routes
-        "/((?!_next|api/auth|images|files|icons|assets|favicon.ico|sitemap.xml|robots.txt|.*\\.).*)",
-        // Include other API routes for rate limiting but exclude auth
-        "/api/((?!auth).*)/:path*",
+        "/((?!_next|api|images|files|icons|assets|favicon.ico|sitemap.xml|robots.txt|.*\\.).*)",
     ],
 };

@@ -24,7 +24,7 @@ import {
 import { Icon } from "@iconify/react";
 interface ProjectPageViewProps {
   trans: {
-    [key: string]: string;
+    [key: string]: any;
   };
 }
 const ProjectPageView = ({ trans }: ProjectPageViewProps) => {

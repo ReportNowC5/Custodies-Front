@@ -1,4 +1,6 @@
+"use client";
 import React from "react";
+import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -34,7 +36,7 @@ const SingleIconMenu = ({ index, activeIndex, item, locationName, trans }: {
                   }
                 )}
               >
-                <item.icon className="w-8 h-8" />
+                <Icon icon={icon} className="w-8 h-8" />
               </Link>
             ) : (
               <button
@@ -48,7 +50,7 @@ const SingleIconMenu = ({ index, activeIndex, item, locationName, trans }: {
                   }
                 )}
               >
-                <item.icon className="w-6 h-6" />
+                <Icon icon={icon} className="w-6 h-6" />
               </button>
             )}
           </TooltipTrigger>

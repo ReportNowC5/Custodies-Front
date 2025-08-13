@@ -22,11 +22,7 @@ const languages = [
     flag: flag1,
   },
   {
-    name: "bn",
-    flag: flag2,
-  },
-  {
-    name: "ar",
+    name: "es",
     flag: flag3,
   },
 ];
@@ -49,11 +45,11 @@ const Language = () => {
     setSelectedLanguage({
       ...selectedLanguage,
       name: lang,
-      language: lang === "en" ? "En" : "Bn",
+      language: lang === "en" ? "En" : "Es",
     });
-    setRtl(lang === "ar");
+    setRtl(lang === "es");
     if (pathname) {
-      router.push(`/${lang}/${pathname.split("/")[2]}`);
+      router.push(`/${lang}${pathname}`);
     }
   };
   return (
