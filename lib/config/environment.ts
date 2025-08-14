@@ -24,10 +24,10 @@ class Environment {
     constructor() {
         this.config = {
             api: {
-                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost'
+                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://suplentes7.incidentq.com/'
             },
             backend: {
-                BACKEND_SERVICE_URL: process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'http://localhost'
+                BACKEND_SERVICE_URL: process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'https://suplentes7.incidentq.com/'
             },
             site: {
                 SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
