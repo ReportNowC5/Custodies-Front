@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn, isLocationMatch } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { Icon } from "@iconify/react";
+
 const SingleMenuItem = ({ item, collapsed }: {
   item: any;
   collapsed: boolean
@@ -27,7 +29,7 @@ const SingleMenuItem = ({ item, collapsed }: {
                 }
               )}
             >
-              <item.icon className="w-6 h-6" />
+              <Icon icon={item.icon} className="w-6 h-6" />
             </span>
           </div>
         ) : (
@@ -43,7 +45,7 @@ const SingleMenuItem = ({ item, collapsed }: {
             )}
           >
             <span className="flex-grow-0">
-              <item.icon className="w-5 h-5" />
+              <Icon icon={item.icon} className="w-5 h-5" />
             </span>
             <div className="text-box flex-grow">{title}</div>
             {badge && <Badge className=" rounded">{item.badge}</Badge>}

@@ -1,4 +1,5 @@
 
+import authService from "@/lib/services/auth.service";
 import { Icon } from "@iconify/react";
 
 export interface MenuItemProps {
@@ -16,22 +17,22 @@ export interface MenuItemProps {
 export const menusConfig: MenuItemProps[] = [
     {
         title: "Dashboard",
-        icon: "heroicons:home", // Cambiar de heroicons-outline:home
+        icon: "heroicons:home",
         href: "/dashboard",
     },
     {
         title: "Clientes",
-        icon: "heroicons:users", // Cambiar de heroicons-outline:users
+        icon: "heroicons:users",
         href: "/customers",
     },
     {
         title: "Usuarios",
-        icon: "heroicons:user-plus", // Cambiar de heroicons-outline:location-marker
+        icon: "heroicons:user-plus",
         href: "/users",
     },
     {
         title: "Dispositivos",
-        icon: "heroicons:wifi", // Cambiar de heroicons-outline:route
+        icon: "heroicons:wifi",
         href: "/devices",
-    },
+    }
 ];

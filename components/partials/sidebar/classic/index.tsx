@@ -12,6 +12,7 @@ import SingleMenuItem from "./single-menu-item";
 import SubMenuHandler from "./sub-menu-handler";
 import NestedSubMenu from "../common/nested-menus";
 import AddBlock from "../common/add-block";
+import LogoutFooter from "../module/logout-footer";
 const ClassicSidebar = ({ trans }: { trans: string }) => {
   const { sidebarBg } = useSidebar();
   const [activeSubmenu, setActiveSubmenu] = useState<number | null>(null);
@@ -149,6 +150,7 @@ const ClassicSidebar = ({ trans }: { trans: string }) => {
         {!collapsed && (
           <div className="-mx-2 ">
             <AddBlock />
+            <LogoutFooter />
           </div>
         )}
       </ScrollArea>

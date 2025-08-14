@@ -57,7 +57,7 @@ const FullScreenToggle: FC = () => {
         </TooltipTrigger>
         <TooltipContent>
           <TooltipArrow className="fill-primary" />
-          <p>Full Screen</p>
+          <p>Pantalla Completa</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

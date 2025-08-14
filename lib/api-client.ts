@@ -3,9 +3,10 @@ import { toast } from 'sonner';
 import { env } from '@/lib/config/environment';
 
 interface ApiResponse<T = any> {
-    data: T;
-    message?: string;
     success: boolean;
+    path?: string;
+    message?: string;
+    error?: string;
     result?: T;
 }
 
@@ -43,16 +44,38 @@ class ApiClient {
             },
             (error) => Promise.reject(error)
         );
-
-        // Response interceptor - SOLO manejar errores, NO refresh automático
+    
+        // Response interceptor - Mejorado con evento personalizado
         this.client.interceptors.response.use(
-            (response: AxiosResponse) => response,
+            (response: AxiosResponse) => {
+                return response;
+            },
             (error: AxiosError) => {
-                // Solo limpiar tokens en 401, NO hacer refresh automático
+                console.error('💥 Error en respuesta:', error.response?.status, error.config?.url);
+                
                 if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+                    console.log('🚫 Token caducado o inválido');
+                    
+                    // Limpiar tokens y estado
                     this.clearTokens();
+                    
+                    // Limpiar localStorage y cookies
                     if (typeof window !== 'undefined') {
-                        window.location.replace('/auth/login');
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        document.cookie = 'auth_token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+                        
+                        // Disparar evento personalizado para que el AuthProvider escuche
+                        window.dispatchEvent(new CustomEvent('auth:logout'));
+                        
+                        // Obtener locale actual de la URL
+                        const currentPath = window.location.pathname;
+                        const locale = currentPath.split('/')[1] || 'es';
+                        
+                        // Redirigir con locale correcto
+                        setTimeout(() => {
+                            window.location.replace(`/${locale}/auth/login`);
+                        }, 100);
                     }
                 }
                 return Promise.reject(error);

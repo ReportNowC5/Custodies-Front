@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import SingleMenuItem from "./single-menu-item";
 import SubMenuHandler from "./sub-menu-handler";
 import NestedSubMenu from "../common/nested-menus";
+import LogoutFooter from "../module/logout-footer";
 const MobileSidebar = ({ className, trans }: { className?: string, trans: any }) => {
   const { sidebarBg, mobileMenu, setMobileMenu } = useSidebar();
   const [activeSubmenu, setActiveSubmenu] = useState<number | null>(null);
@@ -127,6 +128,7 @@ const MobileSidebar = ({ className, trans }: { className?: string, trans: any })
               </li>
             ))}
           </ul>
+          <LogoutFooter />
         </ScrollArea>
       </div>
       {mobileMenu && (

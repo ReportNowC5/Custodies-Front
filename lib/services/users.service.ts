@@ -1,197 +1,78 @@
-import { apiClient } from '../api-client';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: 'administrator' | 'supervisor' | 'operator';
-  status: 'active' | 'inactive';
-  avatar?: string;
-  createdAt: string;
-  updatedAt: string;
-  lastLogin?: string;
-  permissions?: string[];
-}
-
-export interface CreateUserData {
-  name: string;
-  email: string;
-  phone?: string;
-  role: 'administrator' | 'supervisor' | 'operator';
-  password: string;
-  status?: 'active' | 'inactive';
-}
-
-export interface UpdateUserData {
-  name?: string;
-  email?: string;
-  phone?: string;
-  role?: 'administrator' | 'supervisor' | 'operator';
-  status?: 'active' | 'inactive';
-  avatar?: string;
-}
-
-export interface UsersListResponse {
-  users: User[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-export interface UsersFilters {
-  search?: string;
-  role?: string;
-  status?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
+import apiClient from '@/lib/api-client';
+import { 
+    CreateUserRequest, 
+    UpdateUserRequest, 
+    UserResponse, 
+    UsersListResponse, 
+    UserDetailResponse 
+} from '@/lib/types/user';
 
 class UsersService {
-  async getUsers(filters?: UsersFilters): Promise<UsersListResponse> {
-    const params = new URLSearchParams();
-    
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          params.append(key, value.toString());
+    private readonly BASE_URL = '/api/admin/users';
+
+    async getUsers(): Promise<UsersListResponse> {
+        try {
+            console.log('📋 Obteniendo lista de usuarios...');
+            const response = await apiClient.get<UsersListResponse>(this.BASE_URL);
+            console.log('✅ Lista de usuarios obtenida:', response);
+            // filtrar por usuarios que no sean CLIENT
+            return {
+                ...response,
+                result: (response?.result as any).filter((user: any) => user.type !== 'CLIENT') as UserResponse[]
+            } as any;
+        } catch (error: any) {
+            console.error('💥 Error obteniendo usuarios:', error);
+            throw error;
         }
-      });
     }
-    
-    const queryString = params.toString();
-    const url = queryString ? `/users?${queryString}` : '/users';
-    
-    const response = await apiClient.get<UsersListResponse>(url);
-    return response.data;
-  }
 
-  async getUserById(id: string): Promise<User> {
-    const response = await apiClient.get<User>(`/users/${id}`);
-    return response.data;
-  }
-
-  async createUser(userData: CreateUserData): Promise<User> {
-    const response = await apiClient.post<User>('/users', userData);
-    return response.data;
-  }
-
-  async updateUser(id: string, userData: UpdateUserData): Promise<User> {
-    const response = await apiClient.put<User>(`/users/${id}`, userData);
-    return response.data;
-  }
-
-  async deleteUser(id: string): Promise<void> {
-    await apiClient.delete(`/users/${id}`);
-  }
-
-  async toggleUserStatus(id: string): Promise<User> {
-    const response = await apiClient.patch<User>(`/users/${id}/toggle-status`);
-    return response.data;
-  }
-
-  async resetUserPassword(id: string): Promise<{ temporaryPassword: string }> {
-    const response = await apiClient.post<{ temporaryPassword: string }>(`/users/${id}/reset-password`);
-    return response.data;
-  }
-
-  async uploadUserAvatar(id: string, file: File): Promise<User> {
-    const response = await apiClient.uploadFile<User>(`/users/${id}/avatar`, file);
-    return response.data;
-  }
-
-  async getUserPermissions(id: string): Promise<string[]> {
-    const response = await apiClient.get<string[]>(`/users/${id}/permissions`);
-    return response.data;
-  }
-
-  async updateUserPermissions(id: string, permissions: string[]): Promise<void> {
-    await apiClient.put(`/users/${id}/permissions`, { permissions });
-  }
-
-  async getUserStats(): Promise<{
-    total: number;
-    active: number;
-    inactive: number;
-    byRole: Record<string, number>;
-  }> {
-    const response = await apiClient.get<{
-      total: number;
-      active: number;
-      inactive: number;
-      byRole: Record<string, number>;
-    }>('/users/stats');
-    return response.data;
-  }
-
-  async exportUsers(filters?: UsersFilters): Promise<Blob> {
-    const params = new URLSearchParams();
-    
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          params.append(key, value.toString());
+    async getUserById(id: number): Promise<UserDetailResponse> {
+        try {
+            console.log(`👤 Obteniendo usuario con ID: ${id}`);
+            const response = await apiClient.get<UserDetailResponse>(`${this.BASE_URL}/${id}`);
+            console.log('✅ Usuario obtenido:', response);
+            return response as any;
+        } catch (error: any) {
+            console.error(`💥 Error obteniendo usuario ${id}:`, error);
+            throw error;
         }
-      });
     }
-    
-    const queryString = params.toString();
-    const url = queryString ? `/users/export?${queryString}` : '/users/export';
-    
-    const response = await apiClient.downloadFile(url);
-    return new Blob([response.data as BlobPart]);
-  }
 
-  async importUsers(file: File): Promise<{
-    imported: number;
-    failed: number;
-    errors?: Array<{ row: number; error: string }>;
-  }> {
-    const response = await apiClient.uploadFile<{
-      imported: number;
-      failed: number;
-      errors?: Array<{ row: number; error: string }>;
-    }>('/users/import', file);
-    return response.data;
-  }
+    async createUser(userData: CreateUserRequest): Promise<UserDetailResponse> {
+        try {
+            console.log('➕ Creando nuevo usuario:', userData);
+            const response = await apiClient.post<UserDetailResponse>(this.BASE_URL, userData);
+            console.log('✅ Usuario creado:', response);
+            return response as any;
+        } catch (error: any) {
+            console.error('💥 Error creando usuario:', error);
+            throw error;
+        }
+    }
 
-  // Métodos de utilidad
-  getRoleDisplayName(role: string): string {
-    const roleNames: Record<string, string> = {
-      administrator: 'Administrador',
-      supervisor: 'Supervisor',
-      operator: 'Operador',
-    };
-    return roleNames[role] || role;
-  }
+    async updateUser(id: number, userData: UpdateUserRequest): Promise<UserDetailResponse> {
+        try {
+            console.log(`✏️ Actualizando usuario ${id}:`, userData);
+            const response = await apiClient.put<UserDetailResponse>(`${this.BASE_URL}/${id}`, userData);
+            console.log('✅ Usuario actualizado:', response);
+            return response as any;
+        } catch (error: any) {
+            console.error(`💥 Error actualizando usuario ${id}:`, error);
+            throw error;
+        }
+    }
 
-  getStatusDisplayName(status: string): string {
-    const statusNames: Record<string, string> = {
-      active: 'Activo',
-      inactive: 'Inactivo',
-    };
-    return statusNames[status] || status;
-  }
-
-  getStatusColor(status: string): string {
-    const statusColors: Record<string, string> = {
-      active: 'text-green-600 bg-green-100',
-      inactive: 'text-red-600 bg-red-100',
-    };
-    return statusColors[status] || 'text-gray-600 bg-gray-100';
-  }
-
-  getRoleColor(role: string): string {
-    const roleColors: Record<string, string> = {
-      administrator: 'text-purple-600 bg-purple-100',
-      supervisor: 'text-blue-600 bg-blue-100',
-      operator: 'text-green-600 bg-green-100',
-    };
-    return roleColors[role] || 'text-gray-600 bg-gray-100';
-  }
+    async deleteUser(id: number): Promise<{ success: boolean; message: string }> {
+        try {
+            console.log(`🗑️ Eliminando usuario ${id}`);
+            const response = await apiClient.delete<{ success: boolean; message: string }>(`${this.BASE_URL}/${id}`);
+            console.log('✅ Usuario eliminado:', response);
+            return response as any;
+        } catch (error: any) {
+            console.error(`💥 Error eliminando usuario ${id}:`, error);
+            throw error;
+        }
+    }
 }
 
 export const usersService = new UsersService();

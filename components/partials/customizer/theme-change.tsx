@@ -21,6 +21,21 @@ const ThemeChange = () => {
     setTheme(event.target.value);
   };
 
+  // Mapeo de colores en inglés a español
+  const colorTranslations: { [key: string]: string } = {
+    zinc: "Zinc",
+    slate: "Pizarra",
+    stone: "Piedra",
+    gray: "Gris",
+    neutral: "Neutral",
+    red: "Rojo",
+    rose: "Rosa",
+    orange: "Naranja",
+    blue: "Azul",
+    yellow: "Amarillo",
+    violet: "Violeta",
+  };
+
   return (
     <div
       style={{
@@ -30,10 +45,10 @@ const ThemeChange = () => {
       }
     >
       <div className="mb-2 relative inline-block px-3 py-[3px] rounded-md before:bg-[--theme-primary] before:absolute before:top-0 before:left-0 before:w-full  before:h-full before:rounded before:opacity-10 before:z-[-1]  text-[--theme-primary]  text-xs font-medium">
-        Theme
+        Esquema
       </div>
       <div className="text-muted-foreground font-normal text-xs mb-4">
-        Choose a Theme
+        Elige un Esquema
       </div>
       <div className=" flex flex-wrap ">
         {[
@@ -93,9 +108,9 @@ const ThemeChange = () => {
                 </TooltipTrigger>
                 <TooltipContent
                   align="center"
-                  className="rounded-[0.5rem] bg-zinc-900 text-zinc-50  capitalize"
+                  className="rounded-[0.5rem] bg-zinc-900 text-zinc-50 capitalize"
                 >
-                  {value}
+                  {colorTranslations[value] || value}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

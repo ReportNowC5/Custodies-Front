@@ -11,23 +11,23 @@ import DirectionProvider from "@/provider/direction.provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: {
-    default: siteConfig.name,
-    template: `%s - ${siteConfig.name}`,
-  },
-  description: siteConfig.description,
+    title: {
+        default: siteConfig.name,
+        template: `%s - ${siteConfig.name}`,
+    },
+    description: siteConfig.description,
 };
 
 export default function RootLayout({ children, params: { lang } }: { children: React.ReactNode; params: { lang: string } }) {
-  return (
-    <html lang={lang} suppressHydrationWarning={true}>
-      <AuthProvider>
-        <TanstackProvider>
-          <Providers>
-            <DirectionProvider lang={lang}>{children}</DirectionProvider>
-          </Providers>
-        </TanstackProvider>
-      </AuthProvider>
-    </html>
-  );
+    return (
+        <html lang={lang} suppressHydrationWarning={true}>
+            <AuthProvider>
+                <TanstackProvider>
+                    <Providers>
+                        <DirectionProvider lang={lang}>{children}</DirectionProvider>
+                    </Providers>
+                </TanstackProvider>
+            </AuthProvider>
+        </html>
+    );
 }

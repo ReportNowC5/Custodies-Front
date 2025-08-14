@@ -15,12 +15,13 @@ export interface User {
     id: string;
     email: string;
     name: string;
-    role: string;
+    role?: string;
     avatar?: string;
     phone?: string;
-    status: 'active' | 'inactive';
-    createdAt: string;
-    updatedAt: string;
+    isEmailVerified?: boolean;
+    status?: 'active' | 'inactive';
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export interface LoginCredentials {

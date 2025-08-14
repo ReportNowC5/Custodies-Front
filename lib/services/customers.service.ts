@@ -33,9 +33,9 @@ class CustomersService {
             });
 
             const response = await apiClient.get<ApiCustomersResponse>(`${this.BASE_URL}?${params}`);
-            
+            const result = response.result as any;
             // Transformar la respuesta del API al formato esperado
-            const transformedCustomers = response.result?.map((apiCustomer: ApiCustomer) =>
+            const transformedCustomers = result?.map((apiCustomer: ApiCustomer) =>
                 this.transformApiCustomer(apiCustomer)
             ) || [];
 
@@ -54,7 +54,7 @@ class CustomersService {
     async getCustomer(id: string): Promise<Customer> {
         try {
             const response = await apiClient.get<Customer>(`${this.BASE_URL}/${id}`);
-            return response.data;
+            return response.result as any;
         } catch (error) {
             console.error('Error fetching customer:', error);
             throw error;
@@ -64,7 +64,7 @@ class CustomersService {
     async createCustomer(customer: CreateCustomerRequest): Promise<Customer> {
         try {
             const response = await apiClient.post<Customer>(this.BASE_URL, customer);
-            return response.data;
+            return response.result as any;
         } catch (error) {
             console.error('Error creating customer:', error);
             throw error;
@@ -74,7 +74,7 @@ class CustomersService {
     async updateCustomer(customer: UpdateCustomerRequest): Promise<Customer> {
         try {
             const response = await apiClient.put<Customer>(`${this.BASE_URL}/${customer.id}`, customer);
-            return response.data;
+            return response.result as any;
         } catch (error) {
             console.error('Error updating customer:', error);
             throw error;

@@ -26,7 +26,9 @@ const ProfileInfo = () => {
     useEffect(() => {
         const loadUser = async () => {
             const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
+            if (currentUser) {
+                setUser(currentUser);
+            }
         };
         loadUser();
     }, []);

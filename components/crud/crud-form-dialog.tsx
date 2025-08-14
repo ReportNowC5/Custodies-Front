@@ -43,6 +43,8 @@ export interface FormField {
     section?: string;
     icon?: React.ReactNode;
     fullWidth?: boolean;
+    disabled?: boolean;
+    getValue?: (item: any) => string;
 }
 
 interface CrudFormDialogProps {
@@ -236,10 +238,13 @@ export function CrudFormDialog({
     const contactFields = fields.filter(f => f.name === 'email');
     const addressFields = fields.filter(f => ['address', 'interiorNumber', 'postalCode', 'state', 'city', 'colony'].includes(f.name));
     const securityFields = fields.filter(f => ['password', 'confirmPassword'].includes(f.name));
+    const genericFields = fields.filter(f =>
+        !['name', 'rfc', 'type', 'phone', 'email', 'address', 'interiorNumber', 'postalCode', 'state', 'city', 'colony', 'password', 'confirmPassword'].includes(f.name)
+    );
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 font-sans">
                 <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4 px-6 pt-6 flex-shrink-0">
                     <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
                     <Button
@@ -403,6 +408,31 @@ export function CrudFormDialog({
                                         </p>
                                         <div className="space-y-4">
                                             {securityFields.map((field) => (
+                                                <FormField
+                                                    key={field.name}
+                                                    control={form.control}
+                                                    name={field.name}
+                                                    render={({ field: formField }) => (
+                                                        <FormItem>
+                                                            <FormLabel className="text-sm font-medium">
+                                                                {field.label}
+                                                                {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                            </FormLabel>
+                                                            {renderField(field)}
+                                                            <FormMessage className="text-xs" />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Campos Genéricos */}
+                                {genericFields.length > 0 && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {genericFields.map((field) => (
                                                 <FormField
                                                     key={field.name}
                                                     control={form.control}

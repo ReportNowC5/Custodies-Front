@@ -36,7 +36,7 @@ function NavLink({ childItem, locationName, trans }: {
   );
 }
 
-const MenuItem = ({
+const  MenuItem = ({
   childItem,
   toggleNested,
   nestedIndex,

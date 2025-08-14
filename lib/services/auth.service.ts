@@ -33,15 +33,21 @@ class AuthService {
             
             if (response.success && response.result) {
                 const token = response.result.token;
-                const user = response.result.user || { email: credentials.email };
+
+                const user: User = {
+                    id: response.result.id,
+                    email: response.result.email,
+                    name: response.result.name,
+                    role: response.result.type,
+                    avatar: response.result.avatar || null,
+                    isEmailVerified: response.result.isEmailVerified
+                };
                 
-                // Guardar tokens
                 apiClient.setTokens({
                     accessToken: token,
-                    refreshToken: token // Usar el mismo token por ahora
+                    refreshToken: token
                 });
                 
-                // Guardar en localStorage y cookies
                 localStorage.setItem(this.TOKEN_KEY, token);
                 localStorage.setItem(this.USER_KEY, JSON.stringify(user));
                 this.setCookie(this.TOKEN_KEY, token);
@@ -50,7 +56,7 @@ class AuthService {
                 
                 return {
                     success: true,
-                    result: user,
+                    result: [user],
                     message: 'Login exitoso'
                 };
             } else {
@@ -78,20 +84,75 @@ class AuthService {
             console.log('✅ Sesión cerrada');
             
             // Redireccionar
-            window.location.replace('/auth/login');
+            window.location.replace('/es/auth/login');
         }
+    }
+
+    /**
+     * Decodifica un JWT sin verificar la firma (solo para leer el payload)
+     */
+    private decodeJWT(token: string): any {
+        try {
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Token JWT inválido');
+            }
+            
+            const payload = parts[1];
+            const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+            return JSON.parse(decoded);
+        } catch (error) {
+            console.error('Error decodificando JWT:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Verifica si el token ha expirado
+     */
+    private isTokenExpired(decodedToken: any): boolean {
+        if (!decodedToken || !decodedToken.exp) {
+            return true;
+        }
+        
+        const currentTime = Math.floor(Date.now() / 1000);
+        return decodedToken.exp < currentTime;
     }
 
     getCurrentUser(): User | null {
         try {
-            if (typeof window !== 'undefined') {
-                const userStr = localStorage.getItem(this.USER_KEY);
-                return userStr ? JSON.parse(userStr) : null;
+            const user = localStorage.getItem(this.USER_KEY);
+            if (user) {
+                return JSON.parse(user);
             }
+            return null;
         } catch (error) {
-            console.error('Error obteniendo usuario:', error);
+            console.error('Error al obtener el usuario:', error);
+            return null;
         }
-        return null;
+    }
+
+    // Función mejorada para verificar autenticación
+    isAuthenticated(): boolean {
+        const token = this.getToken();
+        if (!token) return false;
+        
+        // Verificar que no sea un token obviamente inválido
+        if (token === 'null' || token === 'undefined' || token === '') {
+            return false;
+        }
+
+        // Verificar que el token sea válido y no haya expirado
+        const decodedToken = this.decodeJWT(token);
+        if (!decodedToken) {
+            return false;
+        }
+
+        if (this.isTokenExpired(decodedToken)) {
+            return false;
+        }
+        
+        return true;
     }
 
     getToken(): string | null {
@@ -99,11 +160,6 @@ class AuthService {
             return localStorage.getItem(this.TOKEN_KEY);
         }
         return null;
-    }
-
-    isAuthenticated(): boolean {
-        const token = this.getToken();
-        return !!token;
     }
 }
 

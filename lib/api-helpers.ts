@@ -5,14 +5,16 @@ import { GenericResponse } from '@/lib/types/auth';
  * Crea una respuesta exitosa estandarizada
  */
 export function createSuccessResponse<T>(
-  data: T[],
   message: string = 'Operación exitosa',
-  path?: string
+  path?: string,
+  success: boolean = true,
+  error?: string,   
+  result?: T[]
 ): NextResponse {
   const response: GenericResponse<T> = {
-    success: true,
+    success,
     message,
-    result: data,
+    result,
     ...(path && { path })
   };
   
@@ -26,10 +28,11 @@ export function createErrorResponse<T = any>(
   message: string,
   statusCode: number = 500,
   error?: string,
-  path?: string
+  path?: string,
+  success: boolean = false
 ): NextResponse {
   const response: GenericResponse<T> = {
-    success: false,
+    success,
     message,
     result: [],
     ...(error && { error }),
@@ -43,14 +46,16 @@ export function createErrorResponse<T = any>(
  * Crea una respuesta de creación exitosa
  */
 export function createCreatedResponse<T>(
-  data: T,
   message: string = 'Recurso creado exitosamente',
-  path?: string
+  path?: string,
+  success: boolean = true,
+  error?: string,
+  result?: T[]
 ): NextResponse {
   const response: GenericResponse<T> = {
-    success: true,
+    success,
     message,
-    result: [data], // Convertir a array según la interfaz
+    result,
     ...(path && { path })
   };
   
@@ -62,9 +67,11 @@ export function createCreatedResponse<T>(
  */
 export function createNotFoundResponse(
   message: string = 'Recurso no encontrado',
-  path?: string
+  path?: string,
+  success: boolean = false,
+  error?: string,
 ): NextResponse {
-  return createErrorResponse(message, 404, 'NOT_FOUND', path);
+  return createErrorResponse(message, 404, 'NOT_FOUND', path, success);
 }
 
 /**

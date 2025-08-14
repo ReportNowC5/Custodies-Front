@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import './assets/scss/globals.scss' // Ruta correcta a los estilos globales
+import './assets/scss/globals.scss'
 
 export const metadata: Metadata = {
   title: 'Custodias ReportNow',
@@ -11,11 +11,5 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <html>
-      <body>
-        {children}
-      </body>
-    </html>
-  )
+  return children; // Solo retornar children, sin html/body
 }

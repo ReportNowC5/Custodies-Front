@@ -67,8 +67,8 @@ const VerticalHeader: React.FC<VerticalHeaderProps> = ({ handleOpenSearch }) => 
   let searchButtonContent = null;
 
   const MainLogo = (
-    <Link href="/dashboard" className=" text-primary ">
-      <SiteLogo className="h-7 w-7" />
+    <Link href="/es/dashboard" className=" text-primary ">
+      <SiteLogo className="!h-12 !w-12" />
     </Link>
   );
   const SearchButton = (
@@ -128,7 +128,7 @@ const VerticalHeader: React.FC<VerticalHeaderProps> = ({ handleOpenSearch }) => 
       <div className="flex items-center md:gap-6 gap-3">
         {LogoContent}
         {menuBarContent}
-        {searchButtonContent}
+        {/*{searchButtonContent}*/}
       </div>
     </>
   );

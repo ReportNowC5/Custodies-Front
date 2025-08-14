@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 // En la interfaz CrudService, cambiar:
-interface CrudService<T> {
+interface CrudService<T, CreateType = Omit<T, 'id'>, UpdateType = Partial<Omit<T, 'id'>>> {
   getAll: () => Promise<T[]>;
-  create: (data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>) => Promise<T>;
-  update: (id: string | number, data: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<T>;
+  create: (data: CreateType) => Promise<T>;
+  update: (id: string | number, data: UpdateType) => Promise<T>;
   delete: (id: string | number) => Promise<void>;
 }
 
-export function useCrudActions<T extends { id: string | number }>(service: CrudService<T>) {
+export function useCrudActions<T extends { id: string | number }, CreateType = Omit<T, 'id'>, UpdateType = Partial<Omit<T, 'id'>>>(service: CrudService<T, CreateType, UpdateType>) {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<T[]>([]);
   const [selectedItem, setSelectedItem] = useState<T | null>(null);
@@ -32,13 +32,10 @@ export function useCrudActions<T extends { id: string | number }>(service: CrudS
     }
 };
 
-  const handleCreate = async (formData: Omit<T, 'id'>) => {
+  const handleCreate = async (formData: CreateType) => {
     setIsLoading(true);
     try {
-      const newItem = await service.create(formData as any);
-      // En lugar de actualizar manualmente el estado:
-      // setData(prev => [...prev, newItem]);
-      // Recargar todos los datos para asegurar consistencia:
+      const newItem = await service.create(formData);
       await loadData();
       toast.success('Elemento creado exitosamente');
     } catch (error) {
@@ -49,7 +46,7 @@ export function useCrudActions<T extends { id: string | number }>(service: CrudS
     }
   };
 
-  const handleUpdate = async (formData: Partial<T>) => {
+  const handleUpdate = async (formData: UpdateType) => {
     if (!selectedItem) return;
     
     setIsLoading(true);

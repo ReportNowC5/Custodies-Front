@@ -10,6 +10,7 @@ export { default as Eye } from "./home/eye.svg";
 export { default as Increase } from "./home/increase.svg";
 export { default as Cup } from "./home/cup.svg";
 export { default as CupBar } from "./home/cup-bar.svg";
+export { default as Logout } from "./duel-tone/logout.svg";
 export { default as NoteIcon } from "./home/note.svg";
 export { default as Users } from "./home/users.svg";
 export { default as Counter } from "./home/counter.svg";

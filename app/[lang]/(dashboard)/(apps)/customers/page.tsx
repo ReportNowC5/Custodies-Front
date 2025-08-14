@@ -274,7 +274,7 @@ const CustomersPage = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 font-sans">
             <CrudTable
                 data={crudActions.data || []}
                 columns={columns}

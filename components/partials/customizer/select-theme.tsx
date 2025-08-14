@@ -10,8 +10,8 @@ import { useThemeStore } from "@/store";
 import { Check } from "lucide-react";
 
 const allThemes = [
-  { key: "light", label: "Light", icon: "heroicons:sun" },
-  { key: "dark", label: "Dark", icon: "heroicons:moon" },
+  { key: "light", label: "Claro", icon: "heroicons:sun" },
+  { key: "dark", label: "Oscuro", icon: "heroicons:moon" },
 ];
 
 const SelectTheme = () => {
@@ -28,10 +28,10 @@ const SelectTheme = () => {
       }
     >
       <div className="mb-2 relative inline-block px-3 py-[3px] rounded-md before:bg-[--theme-primary] before:absolute before:top-0 before:left-0 before:w-full  before:h-full before:rounded before:opacity-10 before:z-[-1]  text-[--theme-primary]  text-xs font-medium">
-        Color Scheme
+        Apariencia
       </div>
       <div className="text-muted-foreground font-normal text-xs mb-4">
-        Choose Light or Dark Scheme.
+        Elige una Apariencia.
       </div>
       <div className=" grid grid-cols-2 gap-3">
         {allThemes?.map((themeOption) => (
