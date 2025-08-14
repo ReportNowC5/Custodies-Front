@@ -9,7 +9,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
         if (index !== -1) {
             demoBoards[index] = payloadItem;
-            return createSuccessResponse([payloadItem], "Board actualizado exitosamente", request.url);
+            return createSuccessResponse("Board actualizado exitosamente", request.url, true, undefined, [payloadItem]);
         } else {
             return createErrorResponse("Board no encontrado", 404, "BOARD_NOT_FOUND", request.url);
         }
@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
         if (index !== -1) {
             const deletedItem = demoBoards.splice(index, 1)[0];
-            return createSuccessResponse([deletedItem], "Board eliminado exitosamente", request.url);
+            return createSuccessResponse("Board eliminado exitosamente", request.url, true, undefined, [deletedItem]);
         } else {
             return createErrorResponse("Board no encontrado", 404, "BOARD_NOT_FOUND", request.url);
         }

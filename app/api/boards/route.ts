@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
-        return createSuccessResponse(demoBoards, "Boards obtenidos exitosamente", request.url);
+        return createSuccessResponse("Boards obtenidos exitosamente", request.url, true, undefined, demoBoards);
     } catch (error) {
         return handleApiError(error, request.url);
     }
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
         newItem.id = demoBoards.length + 1;
         demoBoards.push(newItem);
 
-        return createCreatedResponse(newItem, "Board creado exitosamente", request.url);
+        return createCreatedResponse("Board creado exitosamente", request.url, true, undefined, newItem);
     } catch (error) {
         return handleApiError(error, request.url, "Error al crear board");
     }
@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest) {
                 demoBoards[activeIndex],
             ];
 
-            return createSuccessResponse([], "Boards reordenados exitosamente", request.url);
+            return createSuccessResponse("Boards reordenados exitosamente", request.url, true, undefined, demoBoards);
         } else {
             return createErrorResponse("Board no encontrado", 404, "BOARD_NOT_FOUND", request.url);
         }
