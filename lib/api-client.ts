@@ -20,6 +20,7 @@ class ApiClient {
     private isRefreshing = false;
 
     constructor() {
+        console.log('🚀 Inicializando ApiClient con backend:', env.getBackendUrl());
         this.client = axios.create({
             baseURL: env.getBackendUrl(),
             timeout: 30000,
@@ -51,7 +52,7 @@ class ApiClient {
                 return response;
             },
             (error: AxiosError) => {
-                console.error('💥 Error en respuesta:', error.response?.status, error.config?.url);
+                console.error('💥 Error en respuesta:', error.response?.status, error.config);
                 
                 if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
                     console.log('🚫 Token caducado o inválido');
@@ -109,6 +110,7 @@ class ApiClient {
     }
 
     public async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+        console.log('📤 POST a:', url, 'con datos:', data, "client", this.client);
         const response = await this.client.post(url, data, config);
         return response.data;
     }
