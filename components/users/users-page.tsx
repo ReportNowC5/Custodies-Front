@@ -15,7 +15,7 @@ import { DeleteConfirmationDialog } from '@/components/crud/delete-confirmation-
 import { useCrudActions } from '@/hooks/use-crud-actions';
 import { usersService } from '@/lib/services/users.service';
 import { UserResponse, CreateUserRequest, UpdateUserRequest } from '@/lib/types/user';
-import { MoreHorizontal, Edit, Trash2, UserIcon, PhoneIcon, MailIcon, LockKeyholeIcon } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, User, Phone, Mail, Lock } from 'lucide-react';
 
 const getUserTypeLabel = (type: string) => {
     switch (type) {
@@ -75,14 +75,14 @@ export const UsersPage: React.FC = () => {
             type: 'text',
             placeholder: 'Nombre completo',
             required: true,
-            icon: <UserIcon />,
+            icon: <User />,
         },
         {
             name: 'phone',
             label: 'Teléfono',
             type: 'phone',
             placeholder: '333 333 3333',
-            icon: <PhoneIcon />,
+            icon: <Phone />,
         },
         {
             name: 'email',
@@ -90,7 +90,7 @@ export const UsersPage: React.FC = () => {
             type: 'email',
             placeholder: 'usuario@ejemplo.com',
             required: true,
-            icon: <MailIcon />,
+            icon: <Mail />,
         },
         {
             name: 'type',
@@ -103,7 +103,7 @@ export const UsersPage: React.FC = () => {
             ],
             placeholder: 'Seleccionar tipo...',
             required: true,
-            icon: <UserIcon />,
+            icon: <User />,
         },
         {
             name: 'password',
@@ -111,7 +111,7 @@ export const UsersPage: React.FC = () => {
             type: 'password',
             placeholder: '••••••••••••••••',
             required: !crudActions.selectedItem, // Solo requerida al crear
-            icon: <LockKeyholeIcon />,
+            icon: <Lock />,
         },
         // Solo incluir campo de confirmación de contraseña al crear usuario
         ...(!crudActions.selectedItem ? [
@@ -121,7 +121,7 @@ export const UsersPage: React.FC = () => {
                 type: 'password' as const,
                 placeholder: '••••••••••••••••',
                 required: !crudActions.selectedItem,
-                icon: <LockKeyholeIcon />,
+                icon: <Lock />,
             },
         ] : []),
     ];

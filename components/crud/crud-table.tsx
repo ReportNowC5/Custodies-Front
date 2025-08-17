@@ -28,7 +28,7 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Icon, Plus, Search, SearchIcon } from "lucide-react";
+import { ChevronDown, Plus, Search } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 interface CrudTableProps<T> {
@@ -91,7 +91,7 @@ export function CrudTable<T>({
                 <div className="flex items-center py-4">
                     {searchKey && (
                         <div className="relative">
-                            <SearchIcon className="absolute top-1/2 left-3 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Search className="absolute top-1/2 left-3 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder={searchPlaceholder}
                                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}

@@ -8,7 +8,7 @@ import { useCrudActions } from '@/hooks/use-crud-actions';
 import { customersService } from '@/lib/services/customers.service';
 import { Customer, CreateCustomerRequest, UpdateCustomerRequest } from '@/lib/types/customer';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit, Trash2, UserIcon, PhoneIcon, MailIcon, IdCard, MapPinIcon, Hash, LockKeyholeIcon } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, User, Phone, Mail, CreditCard, MapPin, Hash, Lock } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -118,7 +118,7 @@ const CustomersPage = () => {
             type: 'text',
             placeholder: 'Nombre',
             required: true,
-            icon: <UserIcon />,
+            icon: <User />,
         },
         {
             name: 'rfc',
@@ -126,7 +126,7 @@ const CustomersPage = () => {
             type: 'text',
             placeholder: 'RFC',
             required: true,
-            icon: <IdCard />,
+            icon: <CreditCard />,
         },
         {
             name: 'type',
@@ -138,14 +138,14 @@ const CustomersPage = () => {
             ],
             placeholder: 'Seleccionar...',
             required: true,
-            icon: <UserIcon />,
+            icon: <User />,
         },
         {
             name: 'phone',
             label: 'Teléfono',
             type: 'phone',
             placeholder: '333 333 3333',
-            icon: <PhoneIcon />,
+            icon: <Phone />,
         },
         {
             name: 'email',
@@ -153,14 +153,14 @@ const CustomersPage = () => {
             type: 'email',
             placeholder: 'correo@ejemplo.com',
             required: true,
-            icon: <MailIcon />,
+            icon: <Mail />,
         },
         {
             name: 'address',
             label: 'Calle',
             type: 'text',
             placeholder: 'Ejem. Monte Lisboa',
-            icon: <MapPinIcon />,
+            icon: <MapPin />,
             required: true,
         },
         {
@@ -249,7 +249,7 @@ const CustomersPage = () => {
             type: 'password',
             placeholder: '••••••••••••••••',
             required: true,
-            icon: <LockKeyholeIcon />,
+            icon: <Lock />,
         },
         {
             name: 'confirmPassword',
@@ -257,7 +257,7 @@ const CustomersPage = () => {
             type: 'password',
             placeholder: '••••••••••••••••',
             required: true,
-            icon: <LockKeyholeIcon />,
+            icon: <Lock />,
         },
     ];
 
