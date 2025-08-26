@@ -11,6 +11,7 @@ import {
     getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
+    GlobalFilterTableState,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,24 +37,49 @@ interface CrudTableProps<T> {
     columns: ColumnDef<T>[];
     title: string;
     searchPlaceholder?: string;
-    searchKey?: string;
+    searchColumns?: string[]; // Nuevo: array de columnas para buscar
+    enableGlobalSearch?: boolean; // Nuevo: habilitar búsqueda global
     onAdd?: () => void;
     addButtonText?: string;
     isLoading?: boolean;
 }
+
+// Función de filtro global personalizada
+const globalFilterFn = (row: any, columnId: string, value: string, searchColumns?: string[]) => {
+    if (!value) return true;
+    
+    const searchValue = value.toLowerCase();
+    
+    // Si se especifican columnas de búsqueda, buscar solo en esas
+    if (searchColumns && searchColumns.length > 0) {
+        return searchColumns.some(columnKey => {
+            const cellValue = row.getValue(columnKey);
+            return cellValue != null && 
+                   String(cellValue).toLowerCase().includes(searchValue);
+        });
+    }
+    
+    // Si no se especifican columnas, buscar en todas las columnas visibles
+    return Object.values(row.original).some((cellValue: any) => {
+        return cellValue != null && 
+               String(cellValue).toLowerCase().includes(searchValue);
+    });
+};
 
 export function CrudTable<T>({
     data,
     columns,
     title,
     searchPlaceholder = "Buscar...",
-    searchKey,
+    searchColumns,
+    enableGlobalSearch = true,
     onAdd,
     addButtonText = "Agregar",
     isLoading = false,
 }: CrudTableProps<T>) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+    const [globalFilter, setGlobalFilter] = React.useState<string>("");
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = React.useState({});
 
@@ -62,6 +88,8 @@ export function CrudTable<T>({
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
+        onGlobalFilterChange: setGlobalFilter,
+        globalFilterFn: (row, columnId, value) => globalFilterFn(row, columnId, value, searchColumns),
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -71,6 +99,7 @@ export function CrudTable<T>({
         state: {
             sorting,
             columnFilters,
+            globalFilter,
             columnVisibility,
             rowSelection,
         },
@@ -89,16 +118,14 @@ export function CrudTable<T>({
                     )}
                 </div>
                 <div className="flex items-center py-4">
-                    {searchKey && (
+                    {enableGlobalSearch && (
                         <div className="relative">
                             <Search className="absolute top-1/2 left-3 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder={searchPlaceholder}
-                                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-                                onChange={(event) =>
-                                    table.getColumn(searchKey)?.setFilterValue(event.target.value)
-                                }
-                                className="max-w-sm"
+                                value={globalFilter ?? ""}
+                                onChange={(event) => setGlobalFilter(event.target.value)}
+                                className="max-w-sm pl-10"
                             />
                         </div>
                     )}
