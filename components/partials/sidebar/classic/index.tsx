@@ -18,6 +18,8 @@ const ClassicSidebar = ({ trans }: { trans: string }) => {
   const [activeSubmenu, setActiveSubmenu] = useState<number | null>(null);
   const [activeMultiMenu, setMultiMenu] = useState<number | null>(null);
   const menus = menusConfig || [];
+  // DEBUG: show menus loaded (remove in production)
+  if (typeof window !== 'undefined') console.log('ClassicSidebar menusConfig:', menus);
   const { collapsed, setCollapsed } = useSidebar();
   const { isRtl } = useThemeStore();
   const [hovered, setHovered] = useState<boolean>(false);

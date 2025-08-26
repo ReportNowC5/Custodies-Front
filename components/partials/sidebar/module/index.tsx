@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 
 const ModuleSidebar = ({ trans }: { trans: any }) => {
   const menus = menusConfig || [];
+  // DEBUG: log menus for debugging
+  if (typeof window !== 'undefined') console.log('ModuleSidebar menusConfig:', menus);
   const { subMenu, setSubmenu, collapsed, setCollapsed, sidebarBg } =
     useSidebar();
   const { isRtl } = useThemeStore();

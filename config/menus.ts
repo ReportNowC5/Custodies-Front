@@ -35,4 +35,10 @@ export const menusConfig: MenuItemProps[] = [
         icon: "heroicons:wifi",
         href: "/devices",
     }
+    ,
+    {
+        title: "Activos",
+        icon: "lucide:map-pin",
+        href: "/assets",
+    }
 ];
