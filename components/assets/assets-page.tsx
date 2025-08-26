@@ -20,9 +20,9 @@ import { MoreHorizontal, Edit, Trash2, Tag } from 'lucide-react';
 const getStatusLabel = (status: string) => {
     switch (status) {
         case 'ACTIVE':
-            return 'Active';
+            return 'Activo';
         case 'INACTIVE':
-            return 'Inactive';
+            return 'Inactivo';
         default:
             return status;
     }
@@ -72,45 +72,45 @@ export const AssetsPage: React.FC = () => {
     const formFields: FormField[] = [
         {
             name: 'name',
-            label: 'Name',
+            label: 'Nombre',
             type: 'text',
-            placeholder: 'Eg: Truck #12',
+            placeholder: 'Ej: Camión #12',
             required: true,
             icon: <Tag />,
         },
         {
             name: 'assetType',
-            label: 'Asset Type',
+            label: 'Tipo de Activo',
             type: 'select',
             options: [
-                { value: 'HEAVY_LOAD', label: 'Heavy Load' },
-                { value: 'LIGHT_LOAD', label: 'Light Load' },
-                { value: 'MEDIUM_LOAD', label: 'Medium Load' },
-                { value: 'PASSENGER', label: 'Passenger' },
-                { value: 'CARGO', label: 'Cargo' },
-                { value: 'OTHER', label: 'Other' },
+                { value: 'HEAVY_LOAD', label: 'Carga Pesada' },
+                { value: 'LIGHT_LOAD', label: 'Carga Ligera' },
+                { value: 'MEDIUM_LOAD', label: 'Carga Media' },
+                { value: 'PASSENGER', label: 'Pasajeros' },
+                { value: 'CARGO', label: 'Carga' },
+                { value: 'OTHER', label: 'Otro' },
             ],
-            placeholder: 'Select asset type...',
+            placeholder: 'Seleccione tipo de activo...',
             required: true,
             icon: <Tag />,
         },
         {
             name: 'identifier',
-            label: 'Identifier',
+            label: 'Identificador',
             type: 'text',
-            placeholder: 'Eg: ABC-1234',
+            placeholder: 'Ej: ABC-1234',
             required: true,
             icon: <Tag />,
         },
         {
             name: 'status',
-            label: 'Status',
+            label: 'Estado',
             type: 'select',
             options: [
-                { value: 'ACTIVE', label: 'Active' },
-                { value: 'INACTIVE', label: 'Inactive' },
+                { value: 'ACTIVE', label: 'Activo' },
+                { value: 'INACTIVE', label: 'Inactivo' },
             ],
-            placeholder: 'Select status...',
+            placeholder: 'Seleccione estado...',
             required: true,
             icon: <Tag />,
         },
@@ -148,7 +148,7 @@ export const AssetsPage: React.FC = () => {
         { accessorKey: 'identifier', header: 'Identificador' },
         {
             accessorKey: 'status',
-            header: 'Status',
+            header: 'Estado',
             cell: ({ row }) => {
                 const status = row.getValue('status') as string;
                 return (
@@ -167,7 +167,7 @@ export const AssetsPage: React.FC = () => {
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
+                                <span className="sr-only">Abrir menú</span>
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -197,7 +197,7 @@ export const AssetsPage: React.FC = () => {
                 columns={columns}
                 title="Gestión de Activos"
                 searchPlaceholder="Buscar activos..."
-                searchKey="name"
+                searchColumns={["name"]}
                 onAdd={crudActions.openCreateForm}
                 addButtonText="Agregar Activo"
                 isLoading={crudActions.isLoading}
