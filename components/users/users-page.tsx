@@ -230,7 +230,7 @@ export const UsersPage: React.FC = () => {
                 columns={columns}
                 title="Gestión de Usuarios"
                 searchPlaceholder="Buscar usuarios..."
-                searchKey="name"
+                //searchKey="name"
                 onAdd={crudActions.openCreateForm}
                 addButtonText="Agregar Usuario"
                 isLoading={crudActions.isLoading}

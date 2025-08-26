@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { z } from 'zod';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,6 +19,8 @@ import { customersService } from '@/lib/services/customers.service';
 import { DeviceResponse, CreateDeviceRequest, UpdateDeviceRequest, DeviceClient } from '@/lib/types/device';
 import { Customer } from '@/lib/types/customer';
 import { MoreHorizontal, Edit, Trash2, Smartphone, Tag, Hash, Activity, Users } from 'lucide-react';
+import Link from 'next/link';
+import { Eye } from 'lucide-react';
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -126,6 +129,10 @@ export const DevicesPage: React.FC = () => {
                 placeholder: 'Ej: 358741258963214',
                 required: true,
                 icon: <Hash />,
+                validation: z.string()
+                    .min(1, 'IMEI es requerido')
+                    .max(20, 'El IMEI no puede exceder 20 caracteres')
+                    .regex(/^[0-9]+$/, 'El IMEI solo puede contener números'),
             },
         ] : []),
     ];
@@ -146,6 +153,7 @@ export const DevicesPage: React.FC = () => {
         }
     };
 
+    // En la definición de columnas, agregar una columna de acciones:
     const columns: ColumnDef<DeviceResponse>[] = [
         {
             accessorKey: 'id',
@@ -206,23 +214,32 @@ export const DevicesPage: React.FC = () => {
                 const device = row.original;
                 return (
                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Abrir menú</span>
-                                <MoreHorizontal className="h-4 w-4" />
+                        <DropdownMenuTrigger>
+                            <Button variant="outline" size="sm">
+                                <MoreHorizontal className="h-4 w-4 mr-1" />
+                                Acciones
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => crudActions.openEditForm(device)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
+                        <DropdownMenuContent>
+                            <DropdownMenuItem>
+                                <Link href={`/devices/${device.id}`}>
+                                    <Button variant="outline" size="sm">
+                                        <Eye className="h-4 w-4 mr-1" />
+                                        Ver detalle
+                                    </Button>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => crudActions.openDeleteDialog(device)}
-                                className="text-red-600"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Eliminar
+                            <DropdownMenuItem>
+                                <Button variant="outline" size="sm">
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Editar
+                                </Button>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                                <Button variant="outline" size="sm">
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Eliminar
+                                </Button>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -238,7 +255,7 @@ export const DevicesPage: React.FC = () => {
                 columns={columns}
                 title="Gestión de Dispositivos"
                 searchPlaceholder="Buscar dispositivos..."
-                searchKey="brand"
+                //searchKey="brand"
                 onAdd={crudActions.openCreateForm}
                 addButtonText="Agregar Dispositivo"
                 isLoading={crudActions.isLoading}

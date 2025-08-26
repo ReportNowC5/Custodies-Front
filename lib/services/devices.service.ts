@@ -9,6 +9,11 @@ class DevicesService {
         return response.result as any;
     }
 
+    async getById(id: string | number): Promise<any> {
+        const response = await apiClient.get<DeviceDetailResponse>(`/api/admin/devices/${id}`);
+        return response.result;
+    }
+
     async create(data: CreateDeviceRequest): Promise<DeviceResponse> {
         const response = await apiClient.post<DeviceDetailResponse>('/api/admin/devices', data);
         return response.result as any;

@@ -280,7 +280,7 @@ const CustomersPage = () => {
                 columns={columns}
                 title="Clientes"
                 searchPlaceholder="Buscar clientes..."
-                searchKey="name"
+                //searchKey="name"
                 onAdd={crudActions.openCreateForm}
                 addButtonText="Agregar Cliente"
                 isLoading={crudActions.isLoading}

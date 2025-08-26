@@ -55,6 +55,10 @@ export interface DeviceResponse {
     updatedAt: string;
     deletedAt: string | null;
     client: DeviceClient; // Cambiar de clientId a client
+    location?: {
+        latitude: number;
+        longitude: number;
+    }
 }
 
 export interface DevicesListResponse {
