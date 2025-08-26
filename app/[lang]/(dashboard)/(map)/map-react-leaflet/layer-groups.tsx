@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Circle, FeatureGroup, LayerGroup, MapContainer, Popup, Rectangle, TileLayer } from "react-leaflet"
+import { CircleMarker, FeatureGroup, LayerGroup, MapContainer, Popup, Rectangle, TileLayer } from "react-leaflet"
 
 import { useThemeStore } from "@/store";
 import { useTheme } from "next-themes";
@@ -37,14 +37,16 @@ const LayerGroupMap = ({ height = 350 }: { height?: number }) => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <LayerGroup>
-                <Circle center={position} pathOptions={{ fillColor: "blue" }} />
-                <Circle
+                <CircleMarker center={position} radius={200} pathOptions={{ fillColor: "blue" }} />
+                <CircleMarker
                     center={position}
+                    radius={200}
                     pathOptions={{ fillColor: `hsla(${theme?.cssVars[mode === "dark" ? "dark" : "light"].primary})` }}
                 />
                 <LayerGroup>
-                    <Circle
+                    <CircleMarker
                         center={[51.51, -0.08]}
+                        radius={200}
                         pathOptions={{ fillColor: `hsla(${theme?.cssVars[mode === "dark" ? "dark" : "light"].warning})` }}
                     />
                 </LayerGroup>
@@ -53,7 +55,7 @@ const LayerGroupMap = ({ height = 350 }: { height?: number }) => {
              pathOptions={{ fillColor: `hsla(${theme?.cssVars[mode === "dark" ? "dark" : "light"].info})` }}
             >
                 <Popup>Popup in FeatureGroup</Popup>
-                <Circle center={[51.51, -0.06]}  />
+                <CircleMarker center={[51.51, -0.06]} radius={200} />
                 <Rectangle bounds={rectangle} />
             </FeatureGroup>
         </MapContainer>
