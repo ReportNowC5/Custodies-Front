@@ -40,6 +40,25 @@ const getStatusBadgeVariant = (status: string) => {
     }
 };
 
+const getAssetTypeLabel = (type: string) => {
+    switch (type) {
+        case 'HEAVY_LOAD':
+            return 'Carga Pesada';
+        case 'LIGHT_LOAD':
+            return 'Carga Ligera';
+        case 'MEDIUM_LOAD':
+            return 'Carga Media';
+        case 'PASSENGER':
+            return 'Pasajeros';
+        case 'CARGO':
+            return 'Carga';
+        case 'OTHER':
+            return 'Otro';
+        default:
+            return type || '';
+    }
+};
+
 export const AssetsPage: React.FC = () => {
     const crudActions = useCrudActions<AssetResponse, CreateAssetRequest, UpdateAssetRequest>(assetsService);
 
@@ -144,7 +163,14 @@ export const AssetsPage: React.FC = () => {
     const columns: ColumnDef<AssetResponse>[] = [
         { accessorKey: 'id', header: 'ID' },
         { accessorKey: 'name', header: 'Nombre' },
-        { accessorKey: 'assetType', header: 'Tipo' },
+        {
+            accessorKey: 'assetType',
+            header: 'Tipo',
+            cell: ({ row }) => {
+                const val = row.getValue('assetType') as string;
+                return getAssetTypeLabel(val);
+            },
+        },
         { accessorKey: 'identifier', header: 'Identificador' },
         {
             accessorKey: 'status',
