@@ -19,6 +19,13 @@ const SingleIconMenu = ({ index, activeIndex, item, locationName, trans }: {
   trans: any;
 }) => {
   const { icon, title, href } = item;
+  // compute finalHref with optional language prefix based on current pathname
+  // (client-only hook is safe because this is a client component)
+  const pathname = typeof window !== "undefined" ? window.location.pathname : undefined;
+  const pathSegments = (pathname === null || pathname === void 0 ? void 0 : pathname.split("/")) || [];
+  const langCandidate = pathSegments[1];
+  const hasLang = langCandidate && ["en", "es"].includes(langCandidate);
+  const finalHref = href && href.startsWith("/") && hasLang ? `/${langCandidate}${href}` : href;
   return (
     <>
       <TooltipProvider>
@@ -26,7 +33,7 @@ const SingleIconMenu = ({ index, activeIndex, item, locationName, trans }: {
           <TooltipTrigger asChild>
             {href ? (
               <Link
-                href={href}
+                href={finalHref}
                 className={cn(
                   "h-12 w-12 mx-auto rounded-md  transition-all duration-300 flex flex-col items-center justify-center cursor-pointer relative",
                   {

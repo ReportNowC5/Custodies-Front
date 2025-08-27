@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { useThemeStore } from "@/store";
+import { usePathname } from "next/navigation";
 
 function NavLink({ childItem, locationName, trans }: {
   childItem: any;
@@ -11,9 +12,16 @@ function NavLink({ childItem, locationName, trans }: {
   trans: any
 }) {
   const { href, icon, title, badge } = childItem;
+  // language-aware href
+  const pathname = usePathname();
+  const pathSegments = (pathname === null || pathname === void 0 ? void 0 : pathname.split("/")) || [];
+  const langCandidate = pathSegments[1];
+  const hasLang = langCandidate && ["en", "es"].includes(langCandidate);
+  const finalHref = href && href.startsWith("/") && hasLang ? `/${langCandidate}${href}` : href;
+
   return (
     <Link
-      href={href}
+      href={finalHref}
       className={cn(
         "flex  font-medium  text-sm capitalize px-[10px] py-3 gap-3 rounded-md cursor-pointer",
         {

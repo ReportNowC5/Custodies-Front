@@ -14,6 +14,7 @@ import { CrudFormDialog, FormField } from '@/components/crud/crud-form-dialog';
 import { DeleteConfirmationDialog } from '@/components/crud/delete-confirmation-dialog';
 import { useCrudActions } from '@/hooks/use-crud-actions';
 import { assetsService } from '@/lib/services/assets.service';
+import { devicesService } from '@/lib/services/devices.service';
 import { AssetResponse, CreateAssetRequest, UpdateAssetRequest, AssetType } from '@/lib/types/asset';
 import { MoreHorizontal, Edit, Trash2, Tag } from 'lucide-react';
 
@@ -49,15 +50,14 @@ export const AssetsPage: React.FC = () => {
     const [deviceOptions, setDeviceOptions] = useState<{ value: string; label: string }[]>([]);
 
     useEffect(() => {
-        // Cargar lista de dispositivos desde la API para el select
+        // Cargar lista de dispositivos desde la API para el select usando devicesService
         const loadDevices = async () => {
             try {
-                const res = await fetch('/api/admin/devices');
-                if (!res.ok) return;
-                const data = await res.json();
+                const data = await devicesService.getAll();
+                console.log('Dispositivos cargados:', data);
                 const opts = (data || []).map((d: any) => ({
                     value: String(d.id),
-                    label: d.identifier || d.name || `Device ${d.id}`,
+                    label: d.brand,
                 }));
                 setDeviceOptions(opts);
             } catch (e) {

@@ -18,8 +18,13 @@ const SingleMenuItem = ({ item, collapsed, trans }: {
 
   const pathname = usePathname();
   const locationName = getDynamicPath(pathname);
+  const pathSegments = (pathname === null || pathname === void 0 ? void 0 : pathname.split("/")) || [];
+  const langCandidate = pathSegments[1];
+  const hasLang = langCandidate && ["en", "es"].includes(langCandidate);
+  const finalHref = href && href.startsWith("/") && hasLang ? `/${langCandidate}${href}` : href;
+
   return (
-    <Link href={href}>
+    <Link href={finalHref}>
       <>
         {collapsed ? (
           <div>
