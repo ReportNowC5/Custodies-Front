@@ -9,7 +9,6 @@ import {
     MapContainer,
     TileLayer,
     Popup,
-    Circle,
     CircleMarker,
     Polygon,
     Polyline,
@@ -83,7 +82,7 @@ const VectorLayersMap = ({ height = 350 }) => {
                 attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <Circle center={position}
+            <CircleMarker center={position} radius={20}
                 pathOptions={{ fillColor: `hsla(${theme?.cssVars[mode === "dark" ? "dark" : "light"].primary})` }} />
             <CircleMarker
                 center={[51.51, -0.12]}
