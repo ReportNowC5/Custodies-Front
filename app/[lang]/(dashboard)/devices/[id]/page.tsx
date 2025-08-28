@@ -58,16 +58,25 @@ const getValidCoordinates = (gpsData: any) => {
         }
     }
     
-    // Verificar si es protocolo 0x23 (no incluye coordenadas GPS)
-    const isProtocol23 = parsedData.eventId && parsedData.deviceId && parsedData.data;
-    if (isProtocol23) {
-        // El protocolo 0x23 no incluye coordenadas GPS, no actualizar el mapa
+    // Solo procesar si es tipo 'location'
+    if (parsedData.type !== 'location') {
         return null;
     }
     
-    // Buscar coordenadas en diferentes formatos para otros protocolos
-    const lat = parsedData.latitude || parsedData.lat || null;
-    const lng = parsedData.longitude || parsedData.lng || parsedData.lon || null;
+    // Buscar coordenadas en el nuevo formato de datos
+    let lat = null;
+    let lng = null;
+    
+    // Formato nuevo: data.lat, data.lng
+    if (parsedData.data && parsedData.data.lat && parsedData.data.lng) {
+        lat = parsedData.data.lat;
+        lng = parsedData.data.lng;
+    }
+    // Formatos alternativos
+    else {
+        lat = parsedData.latitude || parsedData.lat || null;
+        lng = parsedData.longitude || parsedData.lng || parsedData.lon || null;
+    }
     
     if (isValidCoordinate(lat, lng)) {
         return {
@@ -99,28 +108,26 @@ export default function DeviceDetailPage() {
         imei: device?.imei,
         enabled: !!device?.imei
     });
+
+    // Log connection status when IMEI is available
+    useEffect(() => {
+        if (device?.imei) {
+            console.log('🚀 Dispositivo cargado - Iniciando conexión WebSocket');
+            console.log('🎯 IMEI del dispositivo:', device.imei);
+            console.log('📡 URL del WebSocket:', 'wss://suplentes7.incidentq.com/gps');
+            console.log('🔄 Estado de conexión:', isConnected ? 'Conectado' : 'Desconectado');
+        }
+    }, [device?.imei, isConnected]);
     
-    // Actualizar coordenadas del mapa solo cuando lleguen datos GPS válidos
+    // Actualizar coordenadas del mapa solo cuando lleguen datos GPS válidos de tipo 'location'
     useEffect(() => {
         const validCoords = getValidCoordinates(gpsData);
         if (validCoords) {
+            console.log('📍 Actualizando mapa con coordenadas GPS en vivo:', validCoords);
             setMapCoordinates(validCoords);
-        } else if (device && !mapCoordinates) {
-            // Solo usar coordenadas del dispositivo si no hay coordenadas del mapa ya establecidas
-            if (isValidCoordinate(device.location?.latitude, device.location?.longitude)) {
-                setMapCoordinates({
-                    latitude: device.location!.latitude,
-                    longitude: device.location!.longitude
-                });
-            } else {
-                // Coordenadas por defecto (Guadalajara, México)
-                setMapCoordinates({
-                    latitude: 20.6985408055856,
-                    longitude: -103.32520332542438
-                });
-            }
         }
-    }, [gpsData, device, mapCoordinates]);
+        // No mostrar marcador si no hay datos GPS de ubicación válidos
+    }, [gpsData]);
 
     useEffect(() => {
         const fetchDevice = async () => {
@@ -317,8 +324,14 @@ export default function DeviceDetailPage() {
                         <div className="w-full h-full bg-gray-100 flex items-center justify-center">
                             <div className="text-center">
                                 <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-gray-500 font-medium">Cargando mapa...</p>
-                                <p className="text-sm text-gray-400 mt-1">Esperando coordenadas válidas</p>
+                                <p className="text-gray-500 font-medium">Esperando datos GPS...</p>
+                                <p className="text-sm text-gray-400 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
+                                {isConnected && (
+                                    <div className="mt-3 flex items-center justify-center gap-2">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                        <span className="text-xs text-green-600">Conectado - Esperando GPS</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
