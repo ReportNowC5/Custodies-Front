@@ -13,7 +13,8 @@ import {
     Smartphone,
     Hash,
     Navigation,
-    MapPinOff
+    MapPinOff,
+    Radar
 } from 'lucide-react';
 
 interface RealTimeStatusProps {
@@ -60,9 +61,89 @@ const formatHexData = (hexString: string) => {
     return hexString.match(/.{1,4}/g)?.join(' ') || hexString;
 };
 
-// Función para formatear datos del protocolo 0x23
+// Función para detectar el protocolo automáticamente
+const detectProtocol = (data: any) => {
+    if (!data) return 'unknown';
+
+    // Buscar protocolo en diferentes ubicaciones posibles
+    const protocolSources = [
+        data.data?.protocolo,
+        data.data?.protocol,
+        data.protocolo,
+        data.protocol,
+        data.type,
+        data.version
+    ];
+
+    for (const source of protocolSources) {
+        if (source && source !== 'unknown') {
+            return source;
+        }
+    }
+
+    // Si tiene estructura específica del protocolo 0x23
+    if (data.eventId && data.deviceId && data.data) {
+        return data.data?.protocolo || '0x23';
+    }
+
+    return 'unknown';
+};
+
+// Función para buscar coordenadas GPS en diferentes campos
+const findGPSCoordinates = (data: any) => {
+    if (!data) return { latitude: null, longitude: null, timestamp: null };
+
+    // Posibles ubicaciones de coordenadas GPS
+    const latSources = [
+        data.latitude, data.lat, data.coords?.lat, data.location?.latitude,
+        data.gps?.latitude, data.position?.lat, data.data?.latitude, data.data?.lat
+    ];
+
+    const lngSources = [
+        data.longitude, data.lng, data.lon, data.coords?.lng, data.coords?.lon,
+        data.location?.longitude, data.gps?.longitude, data.position?.lng,
+        data.position?.lon, data.data?.longitude, data.data?.lng, data.data?.lon
+    ];
+
+    const timestampSources = [
+        data.timestamp, data.ts, data.time, data.gpsTime,
+        data.location?.timestamp, data.coords?.timestamp, data.data?.timestamp
+    ];
+
+    let latitude = null;
+    let longitude = null;
+    let timestamp = null;
+
+    // Encontrar primera coordenada válida
+    for (const lat of latSources) {
+        if (lat !== null && lat !== undefined && !isNaN(parseFloat(lat))) {
+            latitude = parseFloat(lat);
+            break;
+        }
+    }
+
+    for (const lng of lngSources) {
+        if (lng !== null && lng !== undefined && !isNaN(parseFloat(lng))) {
+            longitude = parseFloat(lng);
+            break;
+        }
+    }
+
+    for (const ts of timestampSources) {
+        if (ts) {
+            timestamp = ts;
+            break;
+        }
+    }
+
+    return { latitude, longitude, timestamp };
+};
+
+// Función para formatear datos de cualquier protocolo GPS
 const formatProtocolData = (data: any) => {
     if (!data) return null;
+
+    console.log('📡 Datos GPS recibidos:', data);
 
     // Intentar parsear si es string JSON
     let parsedData = data;
@@ -75,83 +156,83 @@ const formatProtocolData = (data: any) => {
         }
     }
 
-    // Detectar si tiene la estructura del protocolo 0x23
-    const isProtocol23 = parsedData.eventId && parsedData.deviceId && parsedData.data;
-    
-    if (isProtocol23) {
-        // Estructura específica del protocolo 0x23
-        const eventInfo = {
-            eventId: parsedData.eventId ? `${parsedData.eventId.substring(0, 8)}...` : 'No disponible',
-            deviceId: parsedData.deviceId || 'No disponible',
-            type: parsedData.type || 'unknown',
-            timestamp: parsedData.ts ? formatUnixTimestamp(parsedData.ts) : 'No disponible'
-        };
+    // Detectar protocolo automáticamente
+    const detectedProtocol = detectProtocol(parsedData);
+    console.log('🔍 Protocolo detectado:', detectedProtocol);
 
-        const deviceInfo = {
-            imei: parsedData.data?.imei || parsedData.deviceId || 'No disponible',
-            modelo: parsedData.data?.modelo || 'No disponible',
-            protocolo: parsedData.data?.protocolo || '0x23'
-        };
+    // Buscar coordenadas GPS
+    const gpsCoords = findGPSCoordinates(parsedData);
+    console.log('📍 Coordenadas encontradas:', gpsCoords);
 
-        const technicalInfo = {
-            etiqueta: parsedData.data?.etiqueta || 'No disponible',
-            length: parsedData.data?.length || 'No disponible',
-            serial: parsedData.data?.serial || 'No disponible',
-            timestamp: parsedData.data?.timestamp || 'No disponible'
-        };
+    // Información básica del dispositivo
+    const deviceInfo = {
+        imei: parsedData.data?.imei || parsedData.imei || parsedData.deviceId || 'No disponible',
+        modelo: parsedData.data?.modelo || parsedData.modelo || parsedData.model || 'No disponible',
+        protocolo: detectedProtocol
+    };
 
-        const rawData = {
-            rawHex: parsedData.data?.rawHex || 'No disponible',
-            payloadHex: parsedData.data?.payloadHex || 'No disponible'
-        };
+    // Información del evento (si existe)
+    const eventInfo = parsedData.eventId ? {
+        eventId: parsedData.eventId ? `${parsedData.eventId.substring(0, 8)}...` : 'No disponible',
+        deviceId: parsedData.deviceId || 'No disponible',
+        type: parsedData.type || 'unknown',
+        timestamp: parsedData.ts ? formatUnixTimestamp(parsedData.ts) : 'No disponible'
+    } : null;
 
-        return {
-            isProtocol23: true,
-            event: eventInfo,
-            device: deviceInfo,
-            technical: technicalInfo,
-            raw: rawData,
-            hasLocation: false // Protocolo 0x23 no incluye coordenadas GPS
-        };
-    } else {
-        // Formato genérico para otros protocolos
-        const deviceInfo = {
-            imei: parsedData.imei || parsedData.deviceId || 'No disponible',
-            modelo: parsedData.modelo || parsedData.model || 'No disponible',
-            protocolo: parsedData.protocolo || parsedData.protocol || parsedData.type || 'No disponible'
-        };
+    // Información técnica (si existe)
+    const technicalInfo = parsedData.data ? {
+        etiqueta: parsedData.data?.etiqueta || parsedData.etiqueta || 'No disponible',
+        length: parsedData.data?.length || parsedData.length || 'No disponible',
+        serial: parsedData.data?.serial || parsedData.serial || 'No disponible',
+        timestamp: parsedData.data?.timestamp || 'No disponible'
+    } : null;
 
-        const locationInfo = {
-            latitude: parsedData.latitude || parsedData.lat || null,
-            longitude: parsedData.longitude || parsedData.lng || parsedData.lon || null,
-            timestamp: parsedData.ts || parsedData.timestamp || null
-        };
+    // Datos raw (si existen)
+    const rawData = (parsedData.data?.rawHex || parsedData.rawHex) ? {
+        rawHex: parsedData.data?.rawHex || parsedData.rawHex || 'No disponible',
+        payloadHex: parsedData.data?.payloadHex || parsedData.payloadHex || 'No disponible'
+    } : null;
 
-        // Otros datos relevantes
-        const otherData = Object.keys(parsedData)
-            .filter(key => !['imei', 'deviceId', 'modelo', 'model', 'protocolo', 'protocol', 'type', 'latitude', 'lat', 'longitude', 'lng', 'lon', 'ts', 'timestamp'].includes(key))
-            .reduce((obj, key) => {
-                obj[key] = parsedData[key];
-                return obj;
-            }, {} as any);
+    // Otros datos relevantes
+    const excludedKeys = [
+        'imei', 'deviceId', 'modelo', 'model', 'protocolo', 'protocol', 'type',
+        'latitude', 'lat', 'longitude', 'lng', 'lon', 'ts', 'timestamp',
+        'eventId', 'data', 'coords', 'location', 'gps', 'position'
+    ];
 
-        return {
-            isProtocol23: false,
-            device: deviceInfo,
-            location: locationInfo,
-            other: otherData,
-            hasLocation: locationInfo.latitude !== null && locationInfo.longitude !== null
-        };
-    }
+    const otherData = Object.keys(parsedData)
+        .filter(key => !excludedKeys.includes(key))
+        .reduce((obj, key) => {
+            obj[key] = parsedData[key];
+            return obj;
+        }, {} as any);
+
+    const hasLocation = gpsCoords.latitude !== null && gpsCoords.longitude !== null &&
+        isValidCoordinate(gpsCoords.latitude, gpsCoords.longitude);
+
+    return {
+        protocol: detectedProtocol,
+        device: deviceInfo,
+        event: eventInfo,
+        technical: technicalInfo,
+        raw: rawData,
+        location: hasLocation ? {
+            latitude: gpsCoords.latitude,
+            longitude: gpsCoords.longitude,
+            timestamp: gpsCoords.timestamp
+        } : null,
+        other: Object.keys(otherData).length > 0 ? otherData : null,
+        hasLocation
+    };
 };
 
 // Función para validar coordenadas
 const isValidCoordinate = (lat: any, lng: any) => {
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
-    return !isNaN(latitude) && !isNaN(longitude) && 
-           latitude >= -90 && latitude <= 90 && 
-           longitude >= -180 && longitude <= 180;
+    return !isNaN(latitude) && !isNaN(longitude) &&
+        latitude >= -90 && latitude <= 90 &&
+        longitude >= -180 && longitude <= 180;
 };
 
 export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
@@ -256,11 +337,43 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
             {/* Datos GPS en Tiempo Real */}
             {gpsData && (() => {
                 const formattedData = formatProtocolData(gpsData);
-                
+
                 return (
                     <div className="space-y-4">
-                        {/* Información del Evento (solo para protocolo 0x23) */}
-                        {formattedData?.isProtocol23 && (
+                        {/* Protocolo Detectado */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                    <Radar className="h-4 w-4 text-blue-600" />
+                                    Protocolo Detectado
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600">Protocolo</span>
+                                    <Badge
+                                        variant={formattedData?.protocol === 'unknown' ? 'soft' : 'outline'}
+                                        className={`text-xs ${formattedData?.protocol === 'unknown'
+                                                ? 'bg-gray-100 text-gray-700'
+                                                : formattedData?.protocol === '0x23'
+                                                    ? 'bg-blue-100 text-blue-700'
+                                                    : 'bg-green-100 text-green-700'
+                                            }`}
+                                    >
+                                        {formattedData?.protocol || 'unknown'}
+                                    </Badge>
+                                </div>
+                                <div className="mt-2 text-xs text-gray-500">
+                                    {formattedData?.protocol === 'unknown'
+                                        ? 'Protocolo no identificado o genérico'
+                                        : `Protocolo ${formattedData?.protocol} detectado automáticamente`
+                                    }
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Información del Evento (si existe) */}
+                        {formattedData?.event && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -334,8 +447,8 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                             </Card>
                         )}
 
-                        {/* Datos Técnicos (solo para protocolo 0x23) */}
-                        {formattedData?.isProtocol23 && (
+                        {/* Datos Técnicos (si existen) */}
+                        {formattedData?.technical && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -372,8 +485,8 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                             </Card>
                         )}
 
-                        {/* Datos Raw (solo para protocolo 0x23) */}
-                        {formattedData?.isProtocol23 && (
+                        {/* Datos Raw (si existen) */}
+                        {formattedData?.raw && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -413,25 +526,28 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-0">
-                                {formattedData?.hasLocation && !formattedData?.isProtocol23 && isValidCoordinate(formattedData.location?.latitude, formattedData.location?.longitude) ? (
+                                {formattedData?.hasLocation && formattedData?.location ? (
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Latitud</span>
                                             <span className="text-xs font-mono bg-green-50 px-2 py-1 rounded text-green-700">
-                                                {parseFloat(formattedData.location?.latitude).toFixed(6)}
+                                                {formattedData.location?.latitude ? parseFloat(String(formattedData.location.latitude)).toFixed(6) : ''}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Longitud</span>
                                             <span className="text-xs font-mono bg-green-50 px-2 py-1 rounded text-green-700">
-                                                {parseFloat(formattedData.location?.longitude).toFixed(6)}
+                                                {formattedData.location?.longitude ? parseFloat(String(formattedData.location.longitude)).toFixed(6) : ''}
                                             </span>
                                         </div>
                                         {formattedData.location?.timestamp && (
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs text-gray-600">Timestamp GPS</span>
                                                 <span className="text-xs font-mono">
-                                                    {formattedData.location.timestamp}
+                                                    {typeof formattedData.location.timestamp === 'number'
+                                                        ? formatUnixTimestamp(formattedData.location.timestamp)
+                                                        : formattedData.location.timestamp
+                                                    }
                                                 </span>
                                             </div>
                                         )}
@@ -440,12 +556,14 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                     <div className="text-center py-4">
                                         <MapPinOff className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                                         <p className="text-sm text-gray-500 font-medium">
-                                            {formattedData?.isProtocol23 ? 'Sin datos de ubicación GPS' : 'Ubicación no disponible'}
+                                            Sin datos de ubicación GPS
                                         </p>
                                         <p className="text-xs text-gray-400 mt-1">
-                                            {formattedData?.isProtocol23 
-                                                ? 'El protocolo 0x23 no incluye coordenadas GPS' 
-                                                : 'Sin datos de GPS válidos'
+                                            {formattedData?.protocol === '0x23'
+                                                ? 'El protocolo 0x23 no incluye coordenadas GPS'
+                                                : formattedData?.protocol === 'unknown'
+                                                    ? 'Protocolo desconocido - ubicación no disponible'
+                                                    : 'Sin coordenadas GPS válidas en este protocolo'
                                             }
                                         </p>
                                     </div>
@@ -453,8 +571,8 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                             </CardContent>
                         </Card>
 
-                        {/* Datos Adicionales (solo para protocolos genéricos) */}
-                        {formattedData && !formattedData.isProtocol23 && formattedData.other && Object.keys(formattedData.other).length > 0 && (
+                        {/* Datos Adicionales (si existen) */}
+                        {formattedData?.other && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
