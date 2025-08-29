@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { DeviceMap } from '@/components/devices/device-map';
 import { RealTimeStatus } from '@/components/devices/real-time-status';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
+import { useMapAnimations } from '@/hooks/use-map-animations';
 import { devicesService } from '@/lib/services/devices.service';
 import { DeviceResponse } from '@/lib/types/device';
 import { Badge } from '@/components/ui/badge';
@@ -119,14 +120,74 @@ export default function DeviceDetailPage() {
         }
     }, [device?.imei, isConnected]);
     
-    // Actualizar coordenadas del mapa solo cuando lleguen datos GPS válidos de tipo 'location'
+    // Hook para manejar animaciones del mapa con seguimiento en tiempo real
+    const mapAnimations = useMapAnimations({
+        coordinates: mapCoordinates,
+        isConnected,
+        gpsData,
+        autoFollow: true, // Habilitar seguimiento automático
+        flyToDuration: 1300,
+        shakeOnUpdate: true
+    });
+
+    // Toast de debug para datos WebSocket recibidos
+    useEffect(() => {
+        if (gpsData && device?.imei) {
+            let parsedData = gpsData;
+            if (typeof gpsData === 'string') {
+                try {
+                    parsedData = JSON.parse(gpsData);
+                } catch (e) {
+                    parsedData = { rawData: gpsData };
+                }
+            }
+
+            // Mostrar toast de debug con información relevante
+            const dataType = parsedData.type || 'unknown';
+            const deviceId = parsedData.deviceId || parsedData.data?.imei || 'N/A';
+            
+            if (dataType === 'status') {
+                const statusData = parsedData.data || {};
+                toast.success(
+                    `📊 Datos de estado recibidos`,
+                    {
+                        description: `Dispositivo: ${deviceId} | Voltaje: ${statusData.voltaje || 'N/A'}V | GSM: ${statusData.gsm || 'N/A'}/5 | Alarma: ${statusData.alarma === 0 ? 'Sin alarma' : statusData.alarma || 'N/A'}`,
+                        duration: 3000,
+                        className: 'border-l-4 border-l-green-500'
+                    }
+                );
+            } else if (dataType === 'location') {
+                const coords = getValidCoordinates(gpsData);
+                toast.info(
+                    `📍 Datos de ubicación recibidos`,
+                    {
+                        description: coords 
+                            ? `Dispositivo: ${deviceId} | Lat: ${coords.latitude.toFixed(6)} | Lng: ${coords.longitude.toFixed(6)}`
+                            : `Dispositivo: ${deviceId} | Sin coordenadas válidas`,
+                        duration: 3000,
+                        className: 'border-l-4 border-l-blue-500'
+                    }
+                );
+            } else {
+                toast(
+                    `📡 Datos WebSocket recibidos`,
+                    {
+                        description: `Dispositivo: ${deviceId} | Tipo: ${dataType} | Timestamp: ${new Date().toLocaleTimeString()}`,
+                        duration: 2000,
+                        className: 'border-l-4 border-l-purple-500'
+                    }
+                );
+            }
+        }
+    }, [gpsData, device?.imei]);
+
+    // Actualizar coordenadas del mapa cuando lleguen datos GPS válidos
     useEffect(() => {
         const validCoords = getValidCoordinates(gpsData);
         if (validCoords) {
-            console.log('📍 Actualizando mapa con coordenadas GPS en vivo:', validCoords);
+            console.log('📍 Actualizando coordenadas del mapa:', validCoords);
             setMapCoordinates(validCoords);
         }
-        // No mostrar marcador si no hay datos GPS de ubicación válidos
     }, [gpsData]);
 
     useEffect(() => {
@@ -193,19 +254,48 @@ export default function DeviceDetailPage() {
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex h-[calc(100vh-73px)]">
-                {/* Left Panel - Device Info */}
-                <div className="w-1/3 bg-white border-r border-gray-200 p-6 overflow-y-auto">
+            {/* Main Content - Mobile First Layout */}
+            <div className="flex flex-col lg:flex-row h-[calc(100vh-73px)]">
+                {/* Map Section - Top on mobile, Right on desktop */}
+                <div className="order-1 lg:order-2 flex-1 relative h-64 lg:h-full">
+                    {mapCoordinates ? (
+                        <DeviceMap
+                            latitude={mapCoordinates.latitude}
+                            longitude={mapCoordinates.longitude}
+                            deviceName={`${device.brand} ${device.model}`}
+                            className="w-full h-full"
+                            shouldFlyTo={mapAnimations.shouldFlyTo}
+                            shouldShakeMarker={mapAnimations.shouldShakeMarker}
+                            onAnimationComplete={mapAnimations.onAnimationComplete}
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                            <div className="text-center">
+                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-gray-400" />
+                                <p className="text-sm lg:text-base text-gray-500 font-medium">Esperando datos GPS...</p>
+                                <p className="text-xs lg:text-sm text-gray-400 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
+                                {isConnected && (
+                                    <div className="mt-2 lg:mt-3 flex items-center justify-center gap-2">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                        <span className="text-xs text-green-600">Conectado - Esperando GPS</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Device Info Section - Bottom on mobile, Left on desktop */}
+                <div className="order-2 lg:order-1 w-full lg:w-1/3 bg-white border-t lg:border-t-0 lg:border-r border-gray-200 p-4 lg:p-6 overflow-y-auto flex-shrink-0">
                     {/* Device Header */}
-                    <div className="mb-6">
+                    <div className="mb-4 lg:mb-6">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <Hash className="h-6 w-6 text-purple-600" />
+                            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <Hash className="h-5 w-5 lg:h-6 lg:w-6 text-purple-600" />
                             </div>
                             <div>
                                 <div className="text-xs text-gray-500 mb-1">#{device.id.toString().padStart(5, '0')}</div>
-                                <h2 className="text-lg font-semibold text-gray-900">{device.brand}</h2>
+                                <h2 className="text-base lg:text-lg font-semibold text-gray-900">{device.brand}</h2>
                                 <div className="text-sm text-gray-600">{device.model}</div>
                             </div>
                         </div>
@@ -218,58 +308,58 @@ export default function DeviceDetailPage() {
                     </div>
 
                     {/* Device Details List */}
-                    <div className="space-y-4">
+                    <div className="space-y-3 lg:space-y-4">
                         {/* Phone Number */}
                         <div className="flex items-center gap-3">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">No. telefónico</div>
-                                <div className="text-sm font-medium text-gray-900">{device.client?.user?.phone || 'N/A'}</div>
+                            <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">No. telefónico</div>
+                                <div className="text-sm font-medium text-gray-900 truncate">{device.client?.user?.phone || 'N/A'}</div>
                             </div>
                         </div>
 
                         {/* IMEI */}
                         <div className="flex items-center gap-3">
-                            <Hash className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">IMEI</div>
-                                <div className="text-sm font-medium text-gray-900 font-mono">{device.imei}</div>
+                            <Hash className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">IMEI</div>
+                                <div className="text-sm font-medium text-gray-900 font-mono truncate">{device.imei}</div>
                             </div>
                         </div>
 
                         {/* Created Date */}
                         <div className="flex items-center gap-3">
-                            <Calendar className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Creado</div>
-                                <div className="text-sm font-medium text-gray-900">{formatDate(device.createdAt)}</div>
+                            <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Creado</div>
+                                <div className="text-sm font-medium text-gray-900 truncate">{formatDate(device.createdAt)}</div>
                             </div>
                         </div>
 
                         {/* Related Asset */}
                         <div className="flex items-center gap-3">
-                            <Activity className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Activo relacionado</div>
-                                <div className="text-sm font-medium text-gray-900">trailer 2</div>
+                            <Activity className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Activo relacionado</div>
+                                <div className="text-sm font-medium text-gray-900 truncate">trailer 2</div>
                             </div>
                         </div>
 
                         {/* Client */}
                         <div className="flex items-center gap-3">
-                            <Users className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Cliente</div>
-                                <div className="text-sm font-medium text-gray-900">{device.client?.user?.name || 'Report Now'}</div>
+                            <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Cliente</div>
+                                <div className="text-sm font-medium text-gray-900 truncate">{device.client?.user?.name || 'Report Now'}</div>
                             </div>
                         </div>
 
                         {/* Last Location */}
                         <div className="flex items-center gap-3">
-                            <MapPin className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Última ubicación</div>
-                                <div className="text-sm font-medium text-gray-900">
+                            <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Última ubicación</div>
+                                <div className="text-sm font-medium text-gray-900 font-mono text-xs lg:text-sm truncate">
                                     {device.location?.latitude && device.location?.longitude
                                         ? `${device.location.latitude.toFixed(6)}, ${device.location.longitude.toFixed(6)}`
                                         : '20.6985408055856, -103.32520332542438'
@@ -280,26 +370,26 @@ export default function DeviceDetailPage() {
 
                         {/* Last Connection */}
                         <div className="flex items-center gap-3">
-                            <Clock className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Última conexión</div>
-                                <div className="text-sm font-medium text-gray-900">{formatDate(device.updatedAt)}</div>
+                            <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Última conexión</div>
+                                <div className="text-sm font-medium text-gray-900 truncate">{formatDate(device.updatedAt)}</div>
                             </div>
                         </div>
 
                         {/* Battery Level */}
                         <div className="flex items-center gap-3">
-                            <Battery className="h-4 w-4 text-gray-400" />
-                            <div className="flex-1">
-                                <div className="text-sm text-gray-600">Carga del dispositivo</div>
+                            <Battery className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-gray-600">Carga del dispositivo</div>
                                 <div className="text-sm font-medium text-gray-900">42%</div>
                             </div>
                         </div>
                     </div>
                     
                     {/* Real-time Status Section */}
-                    <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-4">Estado en Tiempo Real</h3>
+                    <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-gray-200">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 lg:mb-4">Estado en Tiempo Real</h3>
                         <RealTimeStatus
                             isConnected={isConnected}
                             isConnecting={isConnecting}
@@ -309,32 +399,6 @@ export default function DeviceDetailPage() {
                             reconnectAttempts={reconnectAttempts}
                         />
                     </div>
-                </div>
-
-                {/* Right Panel - Map */}
-                <div className="flex-1 relative">
-                    {mapCoordinates ? (
-                        <DeviceMap
-                            latitude={mapCoordinates.latitude}
-                            longitude={mapCoordinates.longitude}
-                            deviceName={`${device.brand} ${device.model}`}
-                            className="w-full h-full"
-                        />
-                    ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                            <div className="text-center">
-                                <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                                <p className="text-gray-500 font-medium">Esperando datos GPS...</p>
-                                <p className="text-sm text-gray-400 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
-                                {isConnected && (
-                                    <div className="mt-3 flex items-center justify-center gap-2">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                        <span className="text-xs text-green-600">Conectado - Esperando GPS</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

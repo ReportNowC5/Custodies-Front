@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/provider/auth.provider';
 import { Loader2 } from 'lucide-react';
 import ErrorBlock from '@/components/error-block';
+import { useLocaleNavigation } from '@/hooks/use-locale-navigation';
 
 interface RouteGuardProps {
     children: ReactNode;
@@ -28,6 +29,7 @@ export function RouteGuard({
     const { user, isLoading, isAuthenticated, hasRole, checkPermission } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+    const { navigateWithLocale, getLocaleUrl } = useLocaleNavigation();
     const [shouldShowNotFound, setShouldShowNotFound] = useState(false);
 
     useEffect(() => {
@@ -43,19 +45,22 @@ export function RouteGuard({
         if (requireAuth && !isAuthenticated) {
             // Guardar la URL actual para redireccionar después del login
             sessionStorage.setItem('redirectAfterLogin', pathname);
-            router.push(redirectTo);
+            console.log('🔒 User not authenticated, redirecting to login');
+            navigateWithLocale(redirectTo);
             return;
         }
 
         // Verificar rol requerido
         if (requiredRole && !hasRole(requiredRole)) {
-            router.push('/auth/unauthorized');
+            console.log('🚫 User does not have required role, redirecting to unauthorized');
+            navigateWithLocale('/auth/unauthorized');
             return;
         }
 
         // Verificar permiso requerido
         if (requiredPermission && !checkPermission(requiredPermission)) {
-            router.push('/auth/unauthorized');
+            console.log('🚫 User does not have required permission, redirecting to unauthorized');
+            navigateWithLocale('/auth/unauthorized');
             return;
         }
     }, [isLoading, isAuthenticated, user, requiredRole, requiredPermission, router, redirectTo, hasRole, checkPermission, requireAuth, pathname, showNotFound]);

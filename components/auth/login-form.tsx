@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { authService } from "@/lib/services/auth.service";
 import { AuthError, AuthErrorType } from "@/lib/types/auth";
 import Image from 'next/image';
+import { useLocaleNavigation } from "@/hooks/use-locale-navigation";
 
 const schema = z.object({
     email: z.string().email({ message: "Ingresa un correo electrónico válido." }),
@@ -39,6 +40,7 @@ const LoginForm = ({ className }: { className?: string }) => {
     const [error, setError] = React.useState<AuthError | null>(null);
 
     const router = useRouter();
+    const { redirectAfterLogin, getLocaleUrl } = useLocaleNavigation();
     const {
         register,
         handleSubmit,
@@ -133,11 +135,8 @@ const LoginForm = ({ className }: { className?: string }) => {
                     console.log('✅ Login successful, redirecting to dashboard');
                     toast.success('¡Inicio de sesión exitoso!');
 
-                    // Guardar URL de redirección con locale correcto
-                    const redirectUrl = sessionStorage.getItem('redirectAfterLogin') || '/es/dashboard';
-                    sessionStorage.removeItem('redirectAfterLogin');
-
-                    router.push(redirectUrl);
+                    // Usar el hook para manejar la redirección con locale correcto
+                    redirectAfterLogin();
                     reset();
                 } else {
                     console.log('❌ Login failed:', result.message || result.error);
@@ -267,7 +266,7 @@ const LoginForm = ({ className }: { className?: string }) => {
                         </Label>
                     </div>
                     <Link
-                        href="/auth/forgot"
+                        href={getLocaleUrl('/auth/forgot')}
                         className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                     >
                         ¿Olvidaste tu contraseña?

@@ -139,11 +139,64 @@ const findGPSCoordinates = (data: any) => {
     return { latitude, longitude, timestamp };
 };
 
+// Función para calcular porcentaje de batería basado en voltaje
+const calculateBatteryPercentage = (voltage: number) => {
+    // Rango típico para dispositivos GPS: 3.3V (0%) a 4.2V (100%)
+    const minVoltage = 3.3;
+    const maxVoltage = 4.2;
+    
+    if (voltage <= minVoltage) return 0;
+    if (voltage >= maxVoltage) return 100;
+    
+    return Math.round(((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100);
+};
+
+// Función para formatear datos tipo 'status'
+const formatStatusData = (data: any) => {
+    if (!data || data.type !== 'status') return null;
+
+    console.log('📊 Datos de status recibidos:', data);
+
+    const statusData = data.data || {};
+    
+    // Calcular porcentaje de batería
+    const batteryPercentage = statusData.voltaje ? calculateBatteryPercentage(statusData.voltaje) : null;
+    
+    return {
+        type: 'status',
+        device: {
+            imei: statusData.imei || data.deviceId || 'No disponible',
+            modelo: statusData.modelo || 'No disponible',
+            protocolo: statusData.protocolo || 'No disponible'
+        },
+        status: {
+            voltaje: statusData.voltaje || null,
+            batteryPercentage,
+            gsm: statusData.gsm || null,
+            alarma: statusData.alarma || null,
+            status: statusData.status || null,
+            source: statusData.source || null,
+            timestamp: statusData.timestamp || data.ts || null
+        },
+        event: {
+            eventId: data.eventId ? `${data.eventId.substring(0, 8)}...` : 'No disponible',
+            deviceId: data.deviceId || 'No disponible',
+            type: data.type,
+            timestamp: data.ts ? formatUnixTimestamp(data.ts) : 'No disponible'
+        }
+    };
+};
+
 // Función para formatear datos de cualquier protocolo GPS
 const formatProtocolData = (data: any) => {
     if (!data) return null;
 
     console.log('📡 Datos GPS recibidos:', data);
+
+    // Si es tipo 'status', usar formateo específico
+    if (data.type === 'status') {
+        return formatStatusData(data);
+    }
 
     // Intentar parsear si es string JSON
     let parsedData = data;
@@ -352,22 +405,40 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-600">Protocolo</span>
                                     <Badge
-                                        variant={formattedData?.protocol === 'unknown' ? 'soft' : 'outline'}
-                                        className={`text-xs ${formattedData?.protocol === 'unknown'
+                                        variant={(() => {
+                                            const protocol = (formattedData as any)?.type === 'status' 
+                                                ? (formattedData as any)?.device?.protocolo 
+                                                : (formattedData as any)?.protocol;
+                                            return protocol === 'unknown' ? 'soft' : 'outline';
+                                        })()} 
+                                        className={`text-xs ${(() => {
+                                            const protocol = (formattedData as any)?.type === 'status' 
+                                                ? (formattedData as any)?.device?.protocolo 
+                                                : (formattedData as any)?.protocol;
+                                            return protocol === 'unknown'
                                                 ? 'bg-gray-100 text-gray-700'
-                                                : formattedData?.protocol === '0x23'
+                                                : protocol === '0x23'
                                                     ? 'bg-blue-100 text-blue-700'
-                                                    : 'bg-green-100 text-green-700'
-                                            }`}
+                                                    : 'bg-green-100 text-green-700';
+                                        })()}`}
                                     >
-                                        {formattedData?.protocol || 'unknown'}
+                                        {(() => {
+                                            const protocol = (formattedData as any)?.type === 'status' 
+                                                ? (formattedData as any)?.device?.protocolo 
+                                                : (formattedData as any)?.protocol;
+                                            return protocol || 'unknown';
+                                        })()}
                                     </Badge>
                                 </div>
                                 <div className="mt-2 text-xs text-gray-500">
-                                    {formattedData?.protocol === 'unknown'
-                                        ? 'Protocolo no identificado o genérico'
-                                        : `Protocolo ${formattedData?.protocol} detectado automáticamente`
-                                    }
+                                    {(() => {
+                                        const protocol = (formattedData as any)?.type === 'status' 
+                                            ? (formattedData as any)?.device?.protocolo 
+                                            : (formattedData as any)?.protocol;
+                                        return protocol === 'unknown'
+                                            ? 'Protocolo no identificado o genérico'
+                                            : `Protocolo ${protocol} detectado automáticamente`;
+                                    })()}
                                 </div>
                             </CardContent>
                         </Card>
@@ -447,8 +518,119 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                             </Card>
                         )}
 
+                        {/* Estado del Dispositivo (solo para datos tipo 'status') */}
+                        {(formattedData as any)?.type === 'status' && (formattedData as any)?.status && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                        <Activity className="h-4 w-4 text-green-600" />
+                                        Estado del Dispositivo
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-0">
+                                    <div className="space-y-3">
+                                        {/* Voltaje y Batería */}
+                                        {(formattedData as any).status.voltaje && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-600">Voltaje</span>
+                                                    <span className="text-xs font-mono bg-blue-50 px-2 py-1 rounded text-blue-700">
+                                                        {(formattedData as any).status.voltaje}V
+                                                    </span>
+                                                </div>
+                                                {(formattedData as any).status.batteryPercentage !== null && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-600">Carga</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className={`h-full transition-all duration-300 ${
+                                                                        (formattedData as any).status.batteryPercentage > 60 ? 'bg-green-500' :
+                                                                        (formattedData as any).status.batteryPercentage > 30 ? 'bg-yellow-500' : 'bg-red-500'
+                                                                    }`}
+                                                                    style={{ width: `${(formattedData as any).status.batteryPercentage}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <span className={`text-xs font-medium ${
+                                                                (formattedData as any).status.batteryPercentage > 60 ? 'text-green-600' :
+                                                                (formattedData as any).status.batteryPercentage > 30 ? 'text-yellow-600' : 'text-red-600'
+                                                            }`}>
+                                                                {(formattedData as any).status.batteryPercentage}%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Señal GSM */}
+                                        {(formattedData as any).status.gsm !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-600">Señal GSM</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-end gap-1">
+                                                        {[1, 2, 3, 4, 5].map((bar) => (
+                                                            <div
+                                                                key={bar}
+                                                                className={`w-1 rounded-sm ${
+                                                                    bar <= (formattedData as any).status.gsm 
+                                                                        ? 'bg-green-500' 
+                                                                        : 'bg-gray-300'
+                                                                }`}
+                                                                style={{ height: `${bar * 3 + 2}px` }}
+                                                            ></div>
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-xs font-medium text-green-600">
+                                                        {(formattedData as any).status.gsm}/5
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Estado de Alarma */}
+                                        {(formattedData as any).status.alarma !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-600">Alarma</span>
+                                                <Badge 
+                                                    variant={(formattedData as any).status.alarma === 0 ? 'soft' : 'outline'}
+                                                    className={`text-xs ${
+                                                        (formattedData as any).status.alarma === 0 
+                                                            ? 'bg-green-100 text-green-700' 
+                                                            : 'bg-red-100 text-red-700'
+                                                    }`}
+                                                >
+                                                    {(formattedData as any).status.alarma === 0 ? 'Sin alarma' : `Alarma ${(formattedData as any).status.alarma}`}
+                                                </Badge>
+                                            </div>
+                                        )}
+
+                                        {/* Status Code */}
+                                        {(formattedData as any).status.status !== null && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-600">Status</span>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {(formattedData as any).status.status}
+                                                </Badge>
+                                            </div>
+                                        )}
+
+                                        {/* Source */}
+                                        {(formattedData as any).status.source && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-600">Fuente</span>
+                                                <span className="text-xs font-mono bg-gray-50 px-2 py-1 rounded">
+                                                    {(formattedData as any).status.source}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Datos Técnicos (si existen) */}
-                        {formattedData?.technical && (
+                        {(formattedData as any)?.technical && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -461,23 +643,23 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Etiqueta</span>
                                             <Badge variant="outline" className="text-xs">
-                                                {formattedData.technical?.etiqueta}
+                                                {(formattedData as any).technical?.etiqueta}
                                             </Badge>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Length</span>
-                                            <span className="text-xs font-medium">{formattedData?.technical?.length}</span>
+                                            <span className="text-xs font-medium">{(formattedData as any)?.technical?.length}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Serial</span>
                                             <span className="text-xs font-mono bg-gray-50 px-2 py-1 rounded">
-                                                {formattedData.technical?.serial}
+                                                {(formattedData as any).technical?.serial}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Timestamp Data</span>
                                             <span className="text-xs font-mono">
-                                                {formattedData.technical?.timestamp}
+                                                {(formattedData as any).technical?.timestamp}
                                             </span>
                                         </div>
                                     </div>
@@ -486,7 +668,7 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                         )}
 
                         {/* Datos Raw (si existen) */}
-                        {formattedData?.raw && (
+                        {(formattedData as any)?.raw && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -499,13 +681,13 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                         <div>
                                             <span className="text-xs text-gray-600 block mb-1">Raw Hex</span>
                                             <div className="text-xs font-mono bg-gray-50 p-2 rounded border break-all">
-                                                {formatHexData(formattedData.raw?.rawHex)}
+                                                {formatHexData((formattedData as any).raw?.rawHex)}
                                             </div>
                                         </div>
                                         <div>
                                             <span className="text-xs text-gray-600 block mb-1">Payload Hex</span>
                                             <div className="text-xs font-mono bg-blue-50 p-2 rounded border break-all text-blue-700">
-                                                {formatHexData(formattedData.raw?.payloadHex)}
+                                                {formatHexData((formattedData as any).raw?.payloadHex)}
                                             </div>
                                         </div>
                                     </div>
@@ -517,7 +699,7 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                    {formattedData?.hasLocation ? (
+                                    {(formattedData as any)?.hasLocation ? (
                                         <MapPin className="h-4 w-4 text-green-600" />
                                     ) : (
                                         <MapPinOff className="h-4 w-4 text-gray-400" />
@@ -526,27 +708,27 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-0">
-                                {formattedData?.hasLocation && formattedData?.location ? (
+                                {(formattedData as any)?.hasLocation && (formattedData as any)?.location ? (
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Latitud</span>
                                             <span className="text-xs font-mono bg-green-50 px-2 py-1 rounded text-green-700">
-                                                {formattedData.location?.latitude ? parseFloat(String(formattedData.location.latitude)).toFixed(6) : ''}
+                                                {(formattedData as any).location?.latitude ? parseFloat(String((formattedData as any).location.latitude)).toFixed(6) : ''}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-gray-600">Longitud</span>
                                             <span className="text-xs font-mono bg-green-50 px-2 py-1 rounded text-green-700">
-                                                {formattedData.location?.longitude ? parseFloat(String(formattedData.location.longitude)).toFixed(6) : ''}
+                                                {(formattedData as any).location?.longitude ? parseFloat(String((formattedData as any).location.longitude)).toFixed(6) : ''}
                                             </span>
                                         </div>
-                                        {formattedData.location?.timestamp && (
+                                        {(formattedData as any).location?.timestamp && (
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs text-gray-600">Timestamp GPS</span>
                                                 <span className="text-xs font-mono">
-                                                    {typeof formattedData.location.timestamp === 'number'
-                                                        ? formatUnixTimestamp(formattedData.location.timestamp)
-                                                        : formattedData.location.timestamp
+                                                    {typeof (formattedData as any).location.timestamp === 'number'
+                                                        ? formatUnixTimestamp((formattedData as any).location.timestamp)
+                                                        : (formattedData as any).location.timestamp
                                                     }
                                                 </span>
                                             </div>
@@ -559,12 +741,16 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                             Sin datos de ubicación GPS
                                         </p>
                                         <p className="text-xs text-gray-400 mt-1">
-                                            {formattedData?.protocol === '0x23'
-                                                ? 'El protocolo 0x23 no incluye coordenadas GPS'
-                                                : formattedData?.protocol === 'unknown'
-                                                    ? 'Protocolo desconocido - ubicación no disponible'
-                                                    : 'Sin coordenadas GPS válidas en este protocolo'
-                                            }
+                                            {(() => {
+                                                const protocol = (formattedData as any)?.type === 'status' 
+                                                    ? (formattedData as any)?.device?.protocolo 
+                                                    : (formattedData as any)?.protocol;
+                                                return protocol === '0x23'
+                                                    ? 'El protocolo 0x23 no incluye coordenadas GPS'
+                                                    : protocol === 'unknown'
+                                                        ? 'Protocolo desconocido - ubicación no disponible'
+                                                        : 'Sin coordenadas GPS válidas en este protocolo';
+                                            })()} 
                                         </p>
                                     </div>
                                 )}
@@ -572,7 +758,7 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                         </Card>
 
                         {/* Datos Adicionales (si existen) */}
-                        {formattedData?.other && (
+                        {(formattedData as any)?.other && (
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -582,7 +768,7 @@ export const RealTimeStatus: React.FC<RealTimeStatusProps> = ({
                                 </CardHeader>
                                 <CardContent className="pt-0">
                                     <div className="space-y-2 max-h-32 overflow-y-auto">
-                                        {Object.entries(formattedData.other).map(([key, value]) => (
+                                        {Object.entries((formattedData as any).other).map(([key, value]) => (
                                             <div key={key} className="flex items-start justify-between gap-2">
                                                 <span className="text-xs text-gray-600 capitalize flex-shrink-0">
                                                     {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}

@@ -31,8 +31,11 @@ const protectedRoutes = [
 const publicRoutes = [
     '/auth/login',
     '/auth/register',
+    '/auth/forgot',
     '/auth/forgot-password',
     '/auth/reset-password',
+    '/auth/verify',
+    '/auth/unauthorized',
     '/error-page'
 ];
 
