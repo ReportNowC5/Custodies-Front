@@ -32,6 +32,7 @@ export interface CreateDeviceRequest {
     brand: string;
     model: string;
     imei: string;
+    celular: string;
     status: DeviceStatus;
     clientId: number;
 }
@@ -42,6 +43,7 @@ export interface UpdateDeviceRequest {
     status?: DeviceStatus;
     clientId?: number;
     imei?: string;
+    celular?: string;
 }
 
 // Actualizar DeviceResponse para reflejar la estructura real del API
@@ -50,6 +52,7 @@ export interface DeviceResponse {
     brand: string;
     model: string;
     imei: string;
+    celular: string;
     status: DeviceStatus;
     createdAt: string;
     updatedAt: string;

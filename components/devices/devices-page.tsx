@@ -95,6 +95,17 @@ export const DevicesPage: React.FC = () => {
             icon: <Smartphone />,
         },
         {
+            name: 'celular',
+            label: 'Celular',
+            type: 'text',
+            placeholder: 'Ej: +52 55 1234 5678',
+            required: true,
+            icon: <Smartphone />,
+            validation: z.string()
+                .min(1, 'Celular es requerido')
+                .max(20, 'El celular no puede exceder 20 caracteres'),
+        },
+        {
             name: 'status',
             label: 'Estado',
             type: 'select',
@@ -181,6 +192,13 @@ export const DevicesPage: React.FC = () => {
             header: 'IMEI',
             cell: ({ row }) => (
                 <div className="font-mono text-sm">{row.getValue('imei')}</div>
+            ),
+        },
+        {
+            accessorKey: 'celular',
+            header: 'Celular',
+            cell: ({ row }) => (
+                <div className="font-mono text-sm">{row.getValue('celular')}</div>
             ),
         },
         {
