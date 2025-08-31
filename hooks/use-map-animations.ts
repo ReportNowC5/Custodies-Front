@@ -135,37 +135,41 @@ export const useMapAnimations = ({
   
   // Efecto principal para manejar cambios en las coordenadas
   useEffect(() => {
-    if (!coordinates || !isConnected) return;
+    if (!coordinates) return;
     
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
     
-    // Evitar animaciones muy frecuentes (mínimo 1 segundo entre animaciones)
-    if (timeSinceLastUpdate < 1000 && !isFirstLocation) return;
+    // Evitar animaciones muy frecuentes (mínimo 500ms entre animaciones)
+    if (timeSinceLastUpdate < 500 && !isFirstLocation) return;
     
     const hasChanged = hasCoordinatesChanged(coordinates, lastCoordinatesRef.current);
     
-    if (hasChanged) {
+    if (hasChanged || isFirstLocation) {
       console.log('🎯 Coordenadas cambiaron, activando animaciones:', {
         isFirst: isFirstLocation,
         coordinates,
-        previous: lastCoordinatesRef.current
+        previous: lastCoordinatesRef.current,
+        isConnected
       });
       
       if (isFirstLocation) {
-        // Primera ubicación: activar flyTo
+        // Primera ubicación: activar flyTo inmediatamente
+        console.log('🚀 Primera ubicación detectada, activando flyTo');
         triggerFlyTo();
         setIsFirstLocation(false);
-      } else if (shakeOnUpdate) {
-        // Actualizaciones posteriores: activar shake si está habilitado
-        triggerShake();
-      }
-      
-      // Si el modo seguimiento está activo, activar flyTo para seguir el dispositivo
-      if (shouldFollowDevice && !isFirstLocation) {
-        setTimeout(() => {
-          triggerFlyTo();
-        }, 100); // Pequeño delay para evitar conflictos con shake
+      } else {
+        // Actualizaciones posteriores
+        if (shakeOnUpdate) {
+          triggerShake();
+        }
+        
+        // Si el modo seguimiento está activo, activar flyTo para seguir el dispositivo
+        if (shouldFollowDevice) {
+          setTimeout(() => {
+            triggerFlyTo();
+          }, shakeOnUpdate ? 300 : 0); // Delay solo si hay shake
+        }
       }
       
       // Actualizar referencias

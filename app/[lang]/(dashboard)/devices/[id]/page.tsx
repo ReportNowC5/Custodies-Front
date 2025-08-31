@@ -2,15 +2,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DeviceMap } from '@/components/devices/device-map';
-import { RealTimeStatus } from '@/components/devices/real-time-status';
+import { BatteryIndicator } from '@/components/devices/battery-indicator';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 import { useMapAnimations } from '@/hooks/use-map-animations';
 import { devicesService } from '@/lib/services/devices.service';
 import { DeviceResponse } from '@/lib/types/device';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Phone, Hash, Calendar, Activity, Users, MapPin, Clock, Battery } from 'lucide-react';
+import { ArrowLeft, Phone, Hash, Calendar, Activity, Users, MapPin, Battery } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTheme } from "next-themes";
+import { useThemeStore } from "@/store";
+import { themes } from "@/config/thems";
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -89,6 +92,37 @@ const getValidCoordinates = (gpsData: any) => {
     return null;
 };
 
+// Función para extraer datos de batería del WebSocket
+const getBatteryData = (gpsData: any) => {
+    if (!gpsData) return null;
+    
+    // Intentar parsear si es string JSON
+    let parsedData = gpsData;
+    if (typeof gpsData === 'string') {
+        try {
+            parsedData = JSON.parse(gpsData);
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    // Solo procesar si es tipo 'status' y tiene datos de voltaje
+    if (parsedData.type !== 'status' || !parsedData.data) {
+        return null;
+    }
+    
+    const statusData = parsedData.data;
+    const voltage = statusData.voltaje || statusData.voltage;
+    
+    if (voltage && !isNaN(parseFloat(voltage))) {
+        return {
+            voltage: parseFloat(voltage)
+        };
+    }
+    
+    return null;
+};
+
 export default function DeviceDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -96,6 +130,12 @@ export default function DeviceDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [mapCoordinates, setMapCoordinates] = useState<{latitude: number, longitude: number} | null>(null);
+    const [batteryData, setBatteryData] = useState<{voltage: number} | null>(null);
+    
+    // Theme configuration
+    const { theme, setTheme, resolvedTheme: mode } = useTheme();
+    const { theme: config, setTheme: setConfig } = useThemeStore();
+    const newTheme = themes.find((theme) => theme.name === config);
     
     // WebSocket connection for real-time GPS data
     const {
@@ -190,6 +230,15 @@ export default function DeviceDetailPage() {
         }
     }, [gpsData]);
 
+    // Actualizar datos de batería cuando lleguen datos de estado
+    useEffect(() => {
+        const batteryInfo = getBatteryData(gpsData);
+        if (batteryInfo) {
+            console.log('🔋 Actualizando datos de batería:', batteryInfo);
+            setBatteryData(batteryInfo);
+        }
+    }, [gpsData]);
+
     useEffect(() => {
         const fetchDevice = async () => {
             try {
@@ -212,10 +261,15 @@ export default function DeviceDetailPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div
+                style={{
+                    "--theme-primary": `hsl(${newTheme?.cssVars[mode === "dark" ? "dark" : "light"].primary})`,
+                } as React.CSSProperties}
+                className="min-h-screen bg-background flex items-center justify-center"
+            >
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando datos del dispositivo...</p>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[--theme-primary] mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Cargando datos del dispositivo...</p>
                 </div>
             </div>
         );
@@ -223,12 +277,17 @@ export default function DeviceDetailPage() {
 
     if (error || !device) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div
+                style={{
+                    "--theme-primary": `hsl(${newTheme?.cssVars[mode === "dark" ? "dark" : "light"].primary})`,
+                } as React.CSSProperties}
+                className="min-h-screen bg-background flex items-center justify-center"
+            >
                 <div className="text-center">
-                    <div className="text-red-500 text-6xl mb-4">⚠️</div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Error</h2>
-                    <p className="text-gray-600 mb-4">{error || 'Dispositivo no encontrado'}</p>
-                    <Button onClick={() => router.back()} variant="outline">
+                    <div className="text-destructive text-6xl mb-4">⚠️</div>
+                    <h2 className="text-2xl font-bold text-foreground mb-2">Error</h2>
+                    <p className="text-muted-foreground mb-4">{error || 'Dispositivo no encontrado'}</p>
+                    <Button onClick={() => router.back()} variant="outline" className="border-[--theme-primary] text-[--theme-primary] hover:bg-[--theme-primary] hover:text-primary-foreground">
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Volver
                     </Button>
@@ -238,15 +297,20 @@ export default function DeviceDetailPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans">
+        <div
+            style={{
+                "--theme-primary": `hsl(${newTheme?.cssVars[mode === "dark" ? "dark" : "light"].primary})`,
+            } as React.CSSProperties}
+            className="min-h-screen bg-background font-sans"
+        >
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4">
+            <div className="bg-card border-b border-border px-6 py-4">
                 <div className="flex items-center gap-3">
                     <Button
                         onClick={() => router.back()}
                         variant="ghost"
                         size="sm"
-                        className="text-gray-600 hover:text-gray-800"
+                        className="text-muted-foreground hover:text-[--theme-primary] hover:bg-[--theme-primary]/10"
                     >
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Detalles del dispositivo
@@ -269,15 +333,15 @@ export default function DeviceDetailPage() {
                             onAnimationComplete={mapAnimations.onAnimationComplete}
                         />
                     ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                        <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                             <div className="text-center">
-                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-gray-400" />
-                                <p className="text-sm lg:text-base text-gray-500 font-medium">Esperando datos GPS...</p>
-                                <p className="text-xs lg:text-sm text-gray-400 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
+                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
+                                <p className="text-sm lg:text-base text-muted-foreground font-medium">Esperando datos GPS...</p>
+                                <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
                                 {isConnected && (
                                     <div className="mt-2 lg:mt-3 flex items-center justify-center gap-2">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                        <span className="text-xs text-green-600">Conectado - Esperando GPS</span>
+                                        <div className="w-2 h-2 bg-[--theme-primary] rounded-full animate-pulse"></div>
+                                        <span className="text-xs text-[--theme-primary]">Conectado - Esperando GPS</span>
                                     </div>
                                 )}
                             </div>
@@ -286,109 +350,98 @@ export default function DeviceDetailPage() {
                 </div>
 
                 {/* Device Info Section - Bottom on mobile, Left on desktop */}
-                <div className="order-2 lg:order-1 w-full lg:w-1/3 bg-white border-t lg:border-t-0 lg:border-r border-gray-200 p-4 lg:p-6 overflow-y-auto flex-shrink-0">
+                <div className="order-2 lg:order-1 w-full lg:w-1/3 bg-card border-t lg:border-t-0 lg:border-r border-border p-4 lg:p-6 overflow-y-auto flex-shrink-0">
                     {/* Device Header */}
                     <div className="mb-4 lg:mb-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <Hash className="h-5 w-5 lg:h-6 lg:w-6 text-purple-600" />
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-[--theme-primary] text-primary-foreground rounded-lg flex items-center justify-center">
+                                    <Hash className="h-5 w-5 lg:h-6 lg:w-6" />
+                                </div>
+                                <div>
+                                    <div className="text-xs text-muted-foreground mb-1">#{device.id.toString().padStart(5, '0')}</div>
+                                    <h2 className="text-base lg:text-lg font-semibold text-foreground">{device.brand}</h2>
+                                    <div className="text-sm text-muted-foreground">{device.model}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="text-xs text-gray-500 mb-1">#{device.id.toString().padStart(5, '0')}</div>
-                                <h2 className="text-base lg:text-lg font-semibold text-gray-900">{device.brand}</h2>
-                                <div className="text-sm text-gray-600">{device.model}</div>
-                            </div>
+                            <Badge
+                                variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
+                                className={device.status === 'ACTIVE' ? 'bg-[--theme-primary] text-primary-foreground px-3 py-1' : 'bg-destructive text-destructive-foreground px-3 py-1'}
+                            >
+                                {getStatusLabel(device.status)}
+                            </Badge>
                         </div>
-                        <Badge
-                            variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
-                            className={device.status === 'ACTIVE' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
-                        >
-                            {getStatusLabel(device.status)}
-                        </Badge>
                     </div>
 
                     {/* Device Details List */}
                     <div className="space-y-3 lg:space-y-4">
                         {/* Phone Number */}
                         <div className="flex items-center gap-3">
-                            <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <Phone className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">No. telefónico</div>
-                                <div className="text-sm font-medium text-gray-900 truncate">{device.client?.user?.phone || 'N/A'}</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">No. telefónico</div>
+                                <div className="text-sm font-medium text-foreground truncate">{device.client?.user?.phone || 'N/A'}</div>
                             </div>
                         </div>
 
                         {/* IMEI */}
                         <div className="flex items-center gap-3">
-                            <Hash className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <Hash className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">IMEI</div>
-                                <div className="text-sm font-medium text-gray-900 font-mono truncate">{device.imei}</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">IMEI</div>
+                                <div className="text-sm font-medium text-foreground font-mono truncate">{device.imei}</div>
                             </div>
                         </div>
 
                         {/* Created Date */}
                         <div className="flex items-center gap-3">
-                            <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <Calendar className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Creado</div>
-                                <div className="text-sm font-medium text-gray-900 truncate">{formatDate(device.createdAt)}</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">Creado</div>
+                                <div className="text-sm font-medium text-foreground truncate">{formatDate(device.createdAt)}</div>
                             </div>
                         </div>
 
                         {/* Related Asset */}
                         <div className="flex items-center gap-3">
-                            <Activity className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Activo relacionado</div>
-                                <div className="text-sm font-medium text-gray-900 truncate">trailer 2</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">Activo relacionado</div>
+                                <div className="text-sm font-medium text-foreground truncate">trailer 2</div>
                             </div>
                         </div>
 
                         {/* Client */}
                         <div className="flex items-center gap-3">
-                            <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <Users className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Cliente</div>
-                                <div className="text-sm font-medium text-gray-900 truncate">{device.client?.user?.name || 'Report Now'}</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">Cliente</div>
+                                <div className="text-sm font-medium text-foreground truncate">{device.client?.user?.name || 'Report Now'}</div>
                             </div>
                         </div>
 
-                        {/* Last Location */}
-                        <div className="flex items-center gap-3">
-                            <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Última ubicación</div>
-                                <div className="text-sm font-medium text-gray-900 font-mono text-xs lg:text-sm truncate">
-                                    {device.location?.latitude && device.location?.longitude
-                                        ? `${device.location.latitude.toFixed(6)}, ${device.location.longitude.toFixed(6)}`
-                                        : '20.6985408055856, -103.32520332542438'
-                                    }
+                        {/* Battery Status */}
+                        {batteryData && (
+                            <div className="flex items-center gap-3">
+                                <Battery className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-xs lg:text-sm text-muted-foreground">Carga del dispositivo</div>
+                                    <div className="mt-1">
+                                        <BatteryIndicator
+                                            voltage={batteryData.voltage}
+                                            size="sm"
+                                            showVoltage={true}
+                                            showPercentage={true}
+                                            className=""
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Last Connection */}
-                        <div className="flex items-center gap-3">
-                            <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Última conexión</div>
-                                <div className="text-sm font-medium text-gray-900 truncate">{formatDate(device.updatedAt)}</div>
-                            </div>
-                        </div>
-
-                        {/* Battery Level */}
-                        <div className="flex items-center gap-3">
-                            <Battery className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-gray-600">Carga del dispositivo</div>
-                                <div className="text-sm font-medium text-gray-900">42%</div>
-                            </div>
-                        </div>
+                        )}
                     </div>
                     
                     {/* Real-time Status Section */}
-                    <div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-gray-200">
+                    {/*<div className="mt-6 lg:mt-8 pt-4 lg:pt-6 border-t border-gray-200">
                         <h3 className="text-sm font-semibold text-gray-900 mb-3 lg:mb-4">Estado en Tiempo Real</h3>
                         <RealTimeStatus
                             isConnected={isConnected}
@@ -398,7 +451,7 @@ export default function DeviceDetailPage() {
                             gpsData={gpsData}
                             reconnectAttempts={reconnectAttempts}
                         />
-                    </div>
+                    </div>*/}
                 </div>
             </div>
         </div>
