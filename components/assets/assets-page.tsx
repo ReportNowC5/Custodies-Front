@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,7 +17,7 @@ import { useCrudActions } from '@/hooks/use-crud-actions';
 import { assetsService } from '@/lib/services/assets.service';
 import { devicesService } from '@/lib/services/devices.service';
 import { AssetResponse, CreateAssetRequest, UpdateAssetRequest, AssetType } from '@/lib/types/asset';
-import { MoreHorizontal, Edit, Trash2, Tag } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Tag, Eye } from 'lucide-react';
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -60,6 +61,7 @@ const getAssetTypeLabel = (type: string) => {
 };
 
 export const AssetsPage: React.FC = () => {
+    const router = useRouter();
     const crudActions = useCrudActions<AssetResponse, CreateAssetRequest, UpdateAssetRequest>(assetsService);
 
     useEffect(() => {
@@ -198,6 +200,10 @@ export const AssetsPage: React.FC = () => {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`assets/${asset.id}`)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver detalle
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => crudActions.openEditForm(asset)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar

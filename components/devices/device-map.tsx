@@ -17,9 +17,11 @@ const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapCo
 const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
+const Polyline = dynamic(() => import('react-leaflet').then(mod => mod.Polyline), { ssr: false });
 
 // Importar useMap hook directamente (no se puede usar con dynamic)
 import { useMap } from 'react-leaflet';
+import { DeviceHistoryLocation } from '@/lib/types/device';
 
 // Componente del mapa de Leaflet
 const LeafletMapComponent: React.FC<{
@@ -29,7 +31,28 @@ const LeafletMapComponent: React.FC<{
   shouldFlyTo: boolean;
   shouldShakeMarker: boolean;
   onAnimationComplete?: () => void;
-}> = ({ latitude, longitude, deviceName, shouldFlyTo, shouldShakeMarker, onAnimationComplete }) => {
+  historyLocations?: DeviceHistoryLocation[];
+  showRoute?: boolean;
+  routeColor?: string;
+  routeWeight?: number;
+  isPlaying?: boolean;
+  currentLocationIndex?: number;
+  showProgressiveRoute?: boolean;
+}> = ({ 
+  latitude, 
+  longitude, 
+  deviceName, 
+  shouldFlyTo, 
+  shouldShakeMarker, 
+  onAnimationComplete,
+  historyLocations = [],
+  showRoute = false,
+  routeColor = '#10B981',
+  routeWeight = 3,
+  isPlaying = false,
+  currentLocationIndex = 0,
+  showProgressiveRoute = false
+}) => {
   // Todos los hooks deben estar en el top level - SIEMPRE
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -41,6 +64,174 @@ const LeafletMapComponent: React.FC<{
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Procesar ubicaciones del historial para crear la ruta
+  const processRouteCoordinates = useCallback(() => {
+    if (!historyLocations || historyLocations.length === 0) return [];
+    
+    // Ordenar por timestamp y convertir a coordenadas de Leaflet
+    return historyLocations
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .map(location => [location.latitude, location.longitude] as [number, number]);
+  }, [historyLocations]);
+
+  // Obtener coordenadas de la ruta
+  const routeCoordinates = processRouteCoordinates();
+
+  // Función para ajustar el mapa a toda la ruta
+  const fitMapToRoute = useCallback(() => {
+    if (!mapRef.current || routeCoordinates.length === 0) return;
+    
+    // Crear bounds que incluyan todas las coordenadas de la ruta
+    const bounds = L.latLngBounds(routeCoordinates);
+    
+    // Ajustar el mapa con padding
+    mapRef.current.fitBounds(bounds, {
+      padding: [20, 20],
+      maxZoom: 18
+    });
+  }, [routeCoordinates]);
+
+  // Función para obtener color según la velocidad
+  const getSpeedColor = useCallback((speed: number) => {
+    if (speed <= 0) return '#6B7280'; // Gris para parado
+    if (speed <= 20) return '#10B981'; // Verde para velocidad baja
+    if (speed <= 50) return '#F59E0B'; // Amarillo para velocidad media
+    if (speed <= 80) return '#EF4444'; // Rojo para velocidad alta
+    return '#DC2626'; // Rojo oscuro para velocidad muy alta
+  }, []);
+
+  // Crear segmentos de ruta con colores según velocidad
+  const createRouteSegments = useCallback(() => {
+    if (!historyLocations || historyLocations.length < 2) return [];
+    
+    const sortedLocations = historyLocations
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    
+    const segments = [];
+    
+    for (let i = 0; i < sortedLocations.length - 1; i++) {
+      const current = sortedLocations[i];
+      const next = sortedLocations[i + 1];
+      
+      const speed = current.speed || 0;
+      const color = getSpeedColor(speed);
+      
+      segments.push({
+         positions: [
+           [current.latitude, current.longitude] as [number, number],
+           [next.latitude, next.longitude] as [number, number]
+         ],
+         color,
+         speed,
+         weight: speed > 0 ? Math.max(2, Math.min(6, speed / 10)) : 2,
+         opacity: 0.8
+       });
+    }
+    
+    return segments;
+  }, [historyLocations, getSpeedColor]);
+
+  // Obtener segmentos de la ruta
+  const routeSegments = createRouteSegments();
+
+  // Crear segmentos progresivos para animación de reproducción
+  const createProgressiveRouteSegments = useCallback(() => {
+    if (!showProgressiveRoute || !isPlaying || !historyLocations || historyLocations.length < 2) {
+      return routeSegments;
+    }
+    
+    const sortedLocations = historyLocations
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    
+    // Solo mostrar segmentos hasta el índice actual de reproducción
+    const progressiveSegments = [];
+    const maxIndex = Math.min(currentLocationIndex + 1, sortedLocations.length - 1);
+    
+    for (let i = 0; i < maxIndex; i++) {
+      const current = sortedLocations[i];
+      const next = sortedLocations[i + 1];
+      
+      const speed = current.speed || 0;
+      const color = getSpeedColor(speed);
+      
+      // Hacer el último segmento más prominente
+      const isCurrentSegment = i === maxIndex - 1;
+      
+      progressiveSegments.push({
+        positions: [
+          [current.latitude, current.longitude] as [number, number],
+          [next.latitude, next.longitude] as [number, number]
+        ],
+        color: isCurrentSegment ? '#10B981' : color,
+        speed,
+        weight: isCurrentSegment ? Math.max(4, routeWeight + 1) : Math.max(2, Math.min(6, speed / 10)),
+        opacity: isCurrentSegment ? 1 : 0.7
+      });
+    }
+    
+    return progressiveSegments;
+  }, [showProgressiveRoute, isPlaying, historyLocations, currentLocationIndex, routeSegments, getSpeedColor, routeWeight]);
+
+  // Obtener segmentos finales (progresivos o completos)
+  const finalRouteSegments = showProgressiveRoute && isPlaying ? createProgressiveRouteSegments() : routeSegments;
+
+  // Crear iconos para inicio y fin de ruta
+  const createStartIcon = () => {
+    return L.divIcon({
+      html: `
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: #10B981;
+          border: 2px solid #ffffff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+        ">
+          <div style="
+            width: 8px;
+            height: 8px;
+            background: #ffffff;
+            border-radius: 50%;
+          "></div>
+        </div>
+      `,
+      className: 'route-start-marker',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+  };
+
+  const createEndIcon = () => {
+    return L.divIcon({
+      html: `
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: #EF4444;
+          border: 2px solid #ffffff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+        ">
+          <div style="
+            width: 8px;
+            height: 8px;
+            background: #ffffff;
+            border-radius: 50%;
+          "></div>
+        </div>
+      `,
+      className: 'route-end-marker',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+  };
 
   // Crear icono personalizado más atractivo
   const createCustomIcon = () => {
@@ -196,6 +387,16 @@ const LeafletMapComponent: React.FC<{
       createMarker();
     }
   }, [createMarker]);
+
+  // useEffect para ajustar el mapa a la ruta cuando se carga el historial
+  useEffect(() => {
+    if (showRoute && routeCoordinates.length > 1) {
+      // Pequeño delay para asegurar que el mapa esté completamente inicializado
+      setTimeout(() => {
+        fitMapToRoute();
+      }, 500);
+    }
+  }, [showRoute, routeCoordinates.length, fitMapToRoute]);
   // useEffect para actualizar posición - SIEMPRE se ejecuta
   useEffect(() => {
     if (mapRef.current && markerRef.current) {
@@ -307,7 +508,7 @@ const LeafletMapComponent: React.FC<{
   return (
     <MapContainer
       center={[latitude, longitude]}
-      zoom={17}
+      zoom={18}
       style={{ height: '100%', width: '100%' }}
       zoomControl={true}
       attributionControl={false}
@@ -323,15 +524,95 @@ const LeafletMapComponent: React.FC<{
         maxZoom={20}
       />
       
+      {/* Línea principal de tracking - conecta TODAS las coordenadas */}
+      {showRoute && routeCoordinates.length > 1 && (
+        <Polyline
+          key={`main-tracking-line-${isPlaying ? currentLocationIndex : 'static'}`}
+          positions={showProgressiveRoute && isPlaying 
+            ? routeCoordinates.slice(0, currentLocationIndex + 1)
+            : routeCoordinates
+          }
+          pathOptions={{
+            color: '#3B82F6',
+            weight: 4,
+            opacity: 0.9,
+            dashArray: '0',
+            lineCap: 'round',
+            lineJoin: 'round'
+          }}
+        />
+      )}
+      
+      {/* Segmentos de ruta con colores según velocidad */}
+      {showRoute && finalRouteSegments.length > 0 && (
+        <>
+          {finalRouteSegments.map((segment, index) => (
+            <Polyline
+              key={`route-segment-${index}-${isPlaying ? currentLocationIndex : 'static'}`}
+              positions={segment.positions}
+              pathOptions={{
+                color: segment.color,
+                weight: segment.weight,
+                opacity: segment.opacity || 0.6
+              }}
+            />
+          ))}
+        </>
+      )}
+      
+      {/* Marcadores de inicio y fin de ruta */}
+      {showRoute && historyLocations && historyLocations.length > 1 && (
+        <>
+          {/* Marcador de inicio */}
+          <Marker
+            position={[historyLocations[0].latitude, historyLocations[0].longitude]}
+            icon={createStartIcon()}
+          >
+            <Popup>
+              <div style={{
+                background: 'rgba(17, 24, 39, 0.95)',
+                color: 'white',
+                padding: '12px',
+                borderRadius: '6px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                minWidth: '180px'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: '6px', color: '#10B981' }}>🚀 Inicio de Ruta</div>
+                <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
+                  {new Date(historyLocations[0].timestamp).toLocaleString()}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+          
+          {/* Marcador de fin */}
+          <Marker
+            position={[historyLocations[historyLocations.length - 1].latitude, historyLocations[historyLocations.length - 1].longitude]}
+            icon={createEndIcon()}
+          >
+            <Popup>
+              <div style={{
+                background: 'rgba(17, 24, 39, 0.95)',
+                color: 'white',
+                padding: '12px',
+                borderRadius: '6px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                minWidth: '180px'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: '6px', color: '#EF4444' }}>🏁 Fin de Ruta</div>
+                <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
+                  {new Date(historyLocations[historyLocations.length - 1].timestamp).toLocaleString()}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        </>
+      )}
+      
       {/* Marcador personalizado */}
       <Marker 
         position={[latitude, longitude]} 
         icon={createCustomIcon()}
-        ref={(ref) => {
-          if (ref) {
-            markerRef.current = ref;
-          }
-        }}
       >
         <Popup>
           <div style={{
@@ -394,6 +675,14 @@ interface DeviceMapProps {
   shouldFlyTo?: boolean;
   shouldShakeMarker?: boolean;
   onAnimationComplete?: () => void;
+  historyLocations?: DeviceHistoryLocation[];
+  showRoute?: boolean;
+  routeColor?: string;
+  routeWeight?: number;
+  fitToRoute?: boolean;
+  isPlaying?: boolean;
+  currentLocationIndex?: number;
+  showProgressiveRoute?: boolean;
 }
 
 export const DeviceMap: React.FC<DeviceMapProps> = ({
@@ -403,7 +692,15 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
   className = '',
   shouldFlyTo = false,
   shouldShakeMarker = false,
-  onAnimationComplete
+  onAnimationComplete,
+  historyLocations = [],
+  showRoute = false,
+  routeColor = '#10B981',
+  routeWeight = 3,
+  fitToRoute = false,
+  isPlaying = false,
+  currentLocationIndex = 0,
+  showProgressiveRoute = false
 }) => {
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -481,6 +778,13 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
         shouldFlyTo={shouldFlyTo}
         shouldShakeMarker={shouldShakeMarker}
         onAnimationComplete={onAnimationComplete}
+        historyLocations={historyLocations}
+        showRoute={showRoute}
+        routeColor={routeColor}
+        routeWeight={routeWeight}
+        isPlaying={isPlaying}
+        currentLocationIndex={currentLocationIndex}
+        showProgressiveRoute={showProgressiveRoute}
       />
     </div>
   );

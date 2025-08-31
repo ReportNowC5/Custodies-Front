@@ -75,3 +75,47 @@ export interface DeviceDetailResponse {
     message: string;
     result: DeviceResponse;
 }
+
+// Tipos para el historial de dispositivos - Estructura real de la API
+export interface ApiDeviceHistoryLocation {
+    device_id: string;
+    lat: number;
+    lng: number;
+    speed_kmh: number;
+    ts: string;
+}
+
+export interface DeviceHistoryLocation {
+    id: number;
+    deviceId: string;
+    latitude: number;
+    longitude: number;
+    speed?: number;
+    altitude?: number;
+    course?: number;
+    timestamp: string;
+    createdAt: string;
+}
+
+export interface DeviceHistoryResponse {
+    data: ApiDeviceHistoryLocation[];
+    meta: {
+        ts: number;
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+        };
+    };
+}
+
+export interface DeviceHistoryParams {
+    deviceId: string | number;
+    from: string; // ISO date string
+    to: string;   // ISO date string
+    page?: number;
+    limit?: number;
+}

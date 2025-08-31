@@ -17,6 +17,11 @@ class AssetsService {
         return response.result as any;
     }
 
+    async getById(id: string | number): Promise<AssetResponse> {
+        const response = await apiClient.get<AssetDetailResponse>(`/api/admin/assets/${id}`);
+        return response.result as any;
+    }
+
     async delete(id: string | number): Promise<void> {
         await apiClient.delete(`/api/admin/assets/${id}`);
     }
