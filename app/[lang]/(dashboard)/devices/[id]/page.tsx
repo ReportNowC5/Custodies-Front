@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useTheme } from "next-themes";
 import { useThemeStore } from "@/store";
 import { themes } from "@/config/thems";
+import DevicesConnectionsStatus from '@/components/DevicesConnectionsStatus';
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -79,6 +80,7 @@ const getValidCoordinates = (gpsData: any) => {
     // Formatos alternativos
     else {
         lat = parsedData.latitude || parsedData.lat || null;
+                    /* Estado de conexiones de dispositivos - Este bloque debe ir dentro del componente DeviceDetailPage donde 'device' está definido */
         lng = parsedData.longitude || parsedData.lng || parsedData.lon || null;
     }
     
@@ -296,6 +298,7 @@ export default function DeviceDetailPage() {
         );
     }
 
+
     return (
         <div
             style={{
@@ -364,12 +367,15 @@ export default function DeviceDetailPage() {
                                     <div className="text-sm text-muted-foreground">{device.model}</div>
                                 </div>
                             </div>
-                            <Badge
-                                variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
-                                className={device.status === 'ACTIVE' ? 'bg-[--theme-primary] text-primary-foreground px-3 py-1' : 'bg-destructive text-destructive-foreground px-3 py-1'}
-                            >
-                                {getStatusLabel(device.status)}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                <Badge
+                                    variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
+                                    className={device.status === 'ACTIVE' ? 'bg-[--theme-primary] text-primary-foreground px-3 py-1' : 'bg-destructive text-destructive-foreground px-3 py-1'}
+                                >
+                                    {getStatusLabel(device.status)}
+                                </Badge>
+                                <DevicesConnectionsStatus imei={device.imei} />
+                            </div>
                         </div>
                     </div>
 
@@ -403,13 +409,7 @@ export default function DeviceDetailPage() {
                         </div>
 
                         {/* Related Asset */}
-                        <div className="flex items-center gap-3">
-                            <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-muted-foreground">Activo relacionado</div>
-                                <div className="text-sm font-medium text-foreground truncate">trailer 2</div>
-                            </div>
-                        </div>
+                        {/* Estado de conexiones de dispositivos - Eliminado para evitar duplicidad y error de hooks */}
 
                         {/* Client */}
                         <div className="flex items-center gap-3">
