@@ -1,19 +1,22 @@
 
 import React, { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 
 interface Props {
   imei: string;
 }
 
-const SOCKET_URL = 'wss://suplentes7.incidentq.com'; // socket raíz, igual que dashboard
-
 export default function DevicesConnectionsStatus(props: Props) {
   const imei = props.imei;
   const [deviceStatus, setDeviceStatus] = useState<{ status: 'connected' | 'disconnected'; reason?: string } | null>(null);
   const [initialStatus, setInitialStatus] = useState<{ status: 'connected' | 'disconnected'; reason?: string } | null>(null);
-  const [lastPacket, setLastPacket] = useState<any>(null);
   const [updateCount, setUpdateCount] = useState(0);
+
+  // Usar el hook de WebSocket existente en lugar de crear uno nuevo
+  const { gpsData } = useDeviceWebSocket({
+    imei,
+    enabled: true
+  });
 
   // Fetch inicial al montar para obtener el estado actual
   useEffect(() => {
@@ -29,106 +32,53 @@ export default function DevicesConnectionsStatus(props: Props) {
       .catch(() => {});
   }, [imei]);
 
+  // Procesar datos del WebSocket cuando cambien
   useEffect(() => {
-    let socket: Socket | null = null;
-    let isUnmounted = false;
-    socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-
-    // Escuchar evento global 'packet'
-    socket.on('packet', (packet: any) => {
-      if (isUnmounted) return;
-      const pkt = Array.isArray(packet) ? packet[0] : packet;
-      if (pkt.imei !== imei && pkt.deviceId !== imei) return;
-      setLastPacket(pkt);
-      let updated = false;
-      if (pkt.type === 'connection' || pkt.type === 'reconnection' || pkt.type === 'login') {
-        setDeviceStatus({ status: 'connected' });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.type === 'disconnection') {
-        setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.status === 'connected') {
-        setDeviceStatus({ status: 'connected' });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.status === 'disconnected') {
-        setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      // Si no se actualizó por evento, mantener el estado inicial
-      if (!updated && initialStatus) {
-        setDeviceStatus(initialStatus);
-      }
-    });
-
-    socket.on(`gps:packet:${imei}`, (packet: any) => {
-      if (isUnmounted) return;
-      const pkt = Array.isArray(packet) ? packet[0] : packet;
-      setLastPacket(pkt);
-      let updated = false;
-      if (pkt.type === 'connection' || pkt.type === 'reconnection' || pkt.type === 'login') {
-        setDeviceStatus({ status: 'connected' });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.type === 'disconnection') {
-        setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.status === 'connected') {
-        setDeviceStatus({ status: 'connected' });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      if (pkt.status === 'disconnected') {
-        setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
-        setUpdateCount(c => c + 1);
-        updated = true;
-      }
-      // Si no se actualizó por evento, mantener el estado inicial
-      if (!updated && initialStatus) {
-        setDeviceStatus(initialStatus);
-      }
-    });
-
-    return () => {
-      isUnmounted = true;
-      if (socket) {
-        socket.disconnect();
-      }
-    };
-  }, [imei, initialStatus]);
+    if (!gpsData) return;
+    
+    const pkt = Array.isArray(gpsData) ? gpsData[0] : gpsData;
+    console.log(`🎯 DevicesConnectionsStatus procesando gpsData:`, pkt);
+    
+    let updated = false;
+    if (pkt.type === 'connection' || pkt.type === 'reconnection' || pkt.type === 'login') {
+      console.log(`✅ Actualizando a conectado por type: ${pkt.type}`);
+      setDeviceStatus({ status: 'connected' });
+      setUpdateCount(c => c + 1);
+      updated = true;
+    }
+    if (pkt.type === 'disconnection') {
+      console.log(`❌ Actualizando a desconectado por type: ${pkt.type}`);
+      setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
+      setUpdateCount(c => c + 1);
+      updated = true;
+    }
+    if (pkt.status === 'connected') {
+      console.log(`✅ Actualizando a conectado por status: ${pkt.status}`);
+      setDeviceStatus({ status: 'connected' });
+      setUpdateCount(c => c + 1);
+      updated = true;
+    }
+    if (pkt.status === 'disconnected') {
+      console.log(`❌ Actualizando a desconectado por status: ${pkt.status}`);
+      setDeviceStatus({ status: 'disconnected', reason: pkt.reason });
+      setUpdateCount(c => c + 1);
+      updated = true;
+    }
+    if (!updated) {
+      console.log(`⚠️ Evento no procesado:`, pkt);
+    }
+  }, [gpsData]);
 
   if (!deviceStatus) return <span className="ml-4 text-xs text-muted-foreground">Sin estado de conexión</span>;
 
   return (
-    <div>
-      <span className={`ml-4 px-2 py-1 rounded text-xs font-semibold ${deviceStatus.status === 'connected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5em' }}
-        key={updateCount}
-      >
-        {deviceStatus.status === 'connected' ? '🟢 Conectado' : '🔴 Desconectado'}
-        {deviceStatus.status === 'disconnected' && deviceStatus.reason ? ` (${deviceStatus.reason})` : ''}
-        {/* Log visual del último paquete recibido */}
-        {lastPacket && (
-          <span className="ml-2 text-[10px] text-muted-foreground" style={{ maxWidth: 300, overflow: 'auto' }}>
-            Último evento: <code>{JSON.stringify(lastPacket)}</code>
-          </span>
-        )}
+    <div className="ml-4 text-left" key={updateCount}>
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${deviceStatus.status === 'connected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5em' }}>
+        {deviceStatus.status === 'connected' ? 'Conectado' : 'Desconectado'}
       </span>
-      {/* Log visual grande para depuración */}
-      <div style={{marginTop: 8, fontSize: 14, color: '#333', background: '#f8f8f8', padding: 8, borderRadius: 6}}>
-        <strong>Estado actual:</strong> {JSON.stringify(deviceStatus)}<br/>
-        <strong>UpdateCount:</strong> {updateCount}<br/>
-        <strong>IMEI:</strong> {imei}
-      </div>
+      {/* {deviceStatus.status === 'disconnected' && deviceStatus.reason && (
+        <div className="text-xs text-muted-foreground mt-1">{deviceStatus.reason}</div>
+      )} */}
     </div>
   );
 }
