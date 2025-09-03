@@ -6,7 +6,7 @@ import { BatteryIndicator } from '@/components/devices/battery-indicator';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 import { useMapAnimations } from '@/hooks/use-map-animations';
 import { devicesService } from '@/lib/services/devices.service';
-import { DeviceResponse } from '@/lib/types/device';
+import { DeviceResponse, DeviceStatusResponse } from '@/lib/types/device';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Phone, Hash, Calendar, Activity, Users, MapPin, Battery } from 'lucide-react';
@@ -127,10 +127,14 @@ export default function DeviceDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [device, setDevice] = useState<DeviceResponse | null>(null);
+    const [deviceStatus, setDeviceStatus] = useState<DeviceStatusResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [mapCoordinates, setMapCoordinates] = useState<{latitude: number, longitude: number} | null>(null);
     const [batteryData, setBatteryData] = useState<{voltage: number} | null>(null);
+    const [lastConnection, setLastConnection] = useState<string | null>(null);
+    const [lastPosition, setLastPosition] = useState<{timestamp: string, latitude: number, longitude: number} | null>(null);
+    const [lastLocationUpdate, setLastLocationUpdate] = useState<string | null>(null);
     
     // Theme configuration
     const { theme, setTheme, resolvedTheme: mode } = useTheme();
@@ -227,8 +231,21 @@ export default function DeviceDetailPage() {
         if (validCoords) {
             console.log('📍 Actualizando coordenadas del mapa:', validCoords);
             setMapCoordinates(validCoords);
+            setLastLocationUpdate(new Date().toISOString());
+            setLastPosition({
+                timestamp: new Date().toISOString(),
+                latitude: validCoords.latitude,
+                longitude: validCoords.longitude
+            });
         }
     }, [gpsData]);
+
+    // Actualizar última conexión cuando se conecte el WebSocket
+    useEffect(() => {
+        if (isConnected) {
+            setLastConnection(new Date().toISOString());
+        }
+    }, [isConnected]);
 
     // Actualizar datos de batería cuando lleguen datos de estado
     useEffect(() => {
@@ -240,11 +257,47 @@ export default function DeviceDetailPage() {
     }, [gpsData]);
 
     useEffect(() => {
-        const fetchDevice = async () => {
+        const fetchDeviceData = async () => {
             try {
                 setLoading(true);
+                
+                // Cargar datos básicos del dispositivo
                 const deviceData = await devicesService.getById(params.id as string);
                 setDevice(deviceData);
+                
+                // Cargar estado consolidado del dispositivo usando el IMEI
+                if (deviceData?.imei) {
+                    try {
+                        const statusData = await devicesService.getDeviceStatus(deviceData.imei);
+                        setDeviceStatus(statusData);
+                        
+                        // Procesar datos de ubicación del estado consolidado
+                        if (statusData.data.location && statusData.data.summary.has_location) {
+                            setMapCoordinates({
+                                latitude: statusData.data.location.lat,
+                                longitude: statusData.data.location.lng
+                            });
+                            
+                            setLastPosition({
+                                timestamp: statusData.data.location.timestamp,
+                                latitude: statusData.data.location.lat,
+                                longitude: statusData.data.location.lng
+                            });
+                            
+                            setLastLocationUpdate(statusData.data.location.updated_at);
+                        }
+                        
+                        // Procesar datos de conexión del estado consolidado
+                        if (statusData.data.connection && statusData.data.summary.has_connection_info) {
+                            setLastConnection(statusData.data.connection.connected_at);
+                        }
+                        
+                        console.log('📊 Estado consolidado del dispositivo cargado:', statusData);
+                    } catch (statusErr) {
+                        console.warn('⚠️ Error al cargar estado consolidado, usando datos básicos:', statusErr);
+                        // Continuar con datos básicos si el endpoint consolidado falla
+                    }
+                }
             } catch (err) {
                 console.error('Error fetching device:', err);
                 setError('Error al cargar los datos del dispositivo');
@@ -255,7 +308,7 @@ export default function DeviceDetailPage() {
         };
 
         if (params.id) {
-            fetchDevice();
+            fetchDeviceData();
         }
     }, [params.id]);
 
@@ -322,31 +375,19 @@ export default function DeviceDetailPage() {
             <div className="flex flex-col lg:flex-row h-[calc(100vh-73px)]">
                 {/* Map Section - Top on mobile, Right on desktop */}
                 <div className="order-1 lg:order-2 flex-1 relative h-64 lg:h-full">
-                    {mapCoordinates ? (
-                        <DeviceMap
-                            latitude={mapCoordinates.latitude}
-                            longitude={mapCoordinates.longitude}
-                            deviceName={`${device.brand} ${device.model}`}
-                            className="w-full h-full"
-                            shouldFlyTo={mapAnimations.shouldFlyTo}
-                            shouldShakeMarker={mapAnimations.shouldShakeMarker}
-                            onAnimationComplete={mapAnimations.onAnimationComplete}
-                        />
-                    ) : (
-                        <div className="w-full h-full bg-muted/30 flex items-center justify-center">
-                            <div className="text-center">
-                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
-                                <p className="text-sm lg:text-base text-muted-foreground font-medium">Esperando datos GPS...</p>
-                                <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">El mapa se mostrará cuando se reciban coordenadas de ubicación</p>
-                                {isConnected && (
-                                    <div className="mt-2 lg:mt-3 flex items-center justify-center gap-2">
-                                        <div className="w-2 h-2 bg-[--theme-primary] rounded-full animate-pulse"></div>
-                                        <span className="text-xs text-[--theme-primary]">Conectado - Esperando GPS</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <DeviceMap
+                        latitude={mapCoordinates?.latitude || (deviceStatus?.data?.location?.lat || device?.location?.latitude || 19.4326)}
+                        longitude={mapCoordinates?.longitude || (deviceStatus?.data?.location?.lng || device?.location?.longitude || -99.1332)}
+                        deviceName={`${device.brand} ${device.model}`}
+                        className="w-full h-full"
+                        shouldFlyTo={mapAnimations.shouldFlyTo}
+                        shouldShakeMarker={mapAnimations.shouldShakeMarker}
+                        onAnimationComplete={mapAnimations.onAnimationComplete}
+                        hasValidCoordinates={!!mapCoordinates || !!deviceStatus?.data?.summary?.has_location}
+                        isConnected={isConnected || deviceStatus?.data?.summary?.is_connected || false}
+                        lastLocationUpdate={lastPosition?.timestamp || deviceStatus?.data?.location?.timestamp || null}
+                        theme={mode}
+                    />
                 </div>
 
                 {/* Device Info Section - Bottom on mobile, Left on desktop */}
@@ -399,6 +440,51 @@ export default function DeviceDetailPage() {
                             <div className="flex-1 min-w-0">
                                 <div className="text-xs lg:text-sm text-muted-foreground">Creado</div>
                                 <div className="text-sm font-medium text-foreground truncate">{formatDate(device.createdAt)}</div>
+                            </div>
+                        </div>
+
+                        {/* Last Connection */}
+                        <div className="flex items-center gap-3">
+                            <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-muted-foreground">Última conexión</div>
+                                <div className="text-sm font-medium text-foreground truncate">
+                                    {lastConnection || deviceStatus?.data?.connection?.connected_at 
+                                        ? formatDate(lastConnection || deviceStatus?.data?.connection?.connected_at || '') 
+                                        : 'Sin conexión'}
+                                </div>
+                                {deviceStatus?.data?.summary?.is_connected && (
+                                    <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                        Conectado ({deviceStatus.data.connection.connection_duration_seconds}s)
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Last Position */}
+                        <div className="flex items-center gap-3">
+                            <MapPin className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-muted-foreground">Última posición recibida</div>
+                                <div className="text-sm font-medium text-foreground truncate">
+                                    {lastPosition?.timestamp || deviceStatus?.data?.location?.timestamp 
+                                        ? formatDate(lastPosition?.timestamp || deviceStatus?.data?.location?.timestamp || '') 
+                                        : 'Sin posición'}
+                                </div>
+                                {(lastPosition || deviceStatus?.data?.location) && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        {(lastPosition?.latitude || deviceStatus?.data?.location?.lat)?.toFixed(6)}, {(lastPosition?.longitude || deviceStatus?.data?.location?.lng)?.toFixed(6)}
+                                        {deviceStatus?.data?.location?.speed_kmh !== undefined && (
+                                            <span className="ml-2">• {deviceStatus.data.location.speed_kmh} km/h</span>
+                                        )}
+                                    </div>
+                                )}
+                                {deviceStatus?.data?.summary?.location_is_recent && (
+                                    <div className="text-xs text-green-600 mt-1">
+                                        📍 Ubicación reciente ({deviceStatus.data.location.age_seconds}s)
+                                    </div>
+                                )}
                             </div>
                         </div>
 

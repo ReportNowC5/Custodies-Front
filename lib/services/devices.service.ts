@@ -7,7 +7,8 @@ import {
     DeviceDetailResponse,
     DeviceHistoryResponse,
     DeviceHistoryParams,
-    DeviceHistoryLocation
+    DeviceHistoryLocation,
+    DeviceStatusResponse
 } from '@/lib/types/device';
 
 class DevicesService {
@@ -67,6 +68,17 @@ class DevicesService {
             timestamp: item.ts,
             createdAt: item.ts
         })) ?? [];
+    }
+
+    async getDeviceStatus(imei: string): Promise<DeviceStatusResponse> {
+        const response = await apiClient.get<DeviceStatusResponse>(
+            `/api/devices/${imei}/status`
+        );
+
+        const data = (response as any) || {};
+        
+        // Retornar la respuesta directamente ya que coincide con la estructura esperada
+        return data as DeviceStatusResponse;
     }
 }
 

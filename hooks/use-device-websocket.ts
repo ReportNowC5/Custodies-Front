@@ -15,7 +15,8 @@ interface UseDeviceWebSocketProps {
   enabled?: boolean;
 }
 
-const SOCKET_URL = 'wss://suplentes7.incidentq.com/gps';
+//const SOCKET_URL = 'ws://localhost:8081/gps';
+ const SOCKET_URL = 'wss://suplentes7.incidentq.com/gps';
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketProps) => {

@@ -38,6 +38,10 @@ const LeafletMapComponent: React.FC<{
   isPlaying?: boolean;
   currentLocationIndex?: number;
   showProgressiveRoute?: boolean;
+  hasValidCoordinates?: boolean;
+  isConnected?: boolean;
+  lastLocationUpdate?: string | null;
+  theme?: string;
 }> = ({ 
   latitude, 
   longitude, 
@@ -51,7 +55,11 @@ const LeafletMapComponent: React.FC<{
   routeWeight = 3,
   isPlaying = false,
   currentLocationIndex = 0,
-  showProgressiveRoute = false
+  showProgressiveRoute = false,
+  hasValidCoordinates = false,
+  isConnected = false,
+  lastLocationUpdate = null,
+  theme = 'dark'
 }) => {
   // Todos los hooks deben estar en el top level - SIEMPRE
   const mapRef = useRef<L.Map | null>(null);
@@ -408,72 +416,65 @@ const LeafletMapComponent: React.FC<{
           Math.abs(currentPosition.lat - latitude) > 0.0001 || 
           Math.abs(currentPosition.lng - longitude) > 0.0001) {
         
-        // Actualizar posición del marcador
+        // Actualizar posición del marcador con animación suave
         markerRef.current.setLatLng(newPosition);
         
-        // Re-centrado automático: si el usuario movió el mapa y llegan nuevas coordenadas
-        if (!shouldFlyTo && userInteractedRef.current) {
-            
+        // Centrado automático suave solo si hay coordenadas válidas del websocket
+        if (hasValidCoordinates && !shouldFlyTo) {
           lastAutoMoveRef.current = Date.now();
-          mapRef.current.setView(newPosition, Math.max(16, mapRef.current.getZoom()), {
+          
+          // Usar panTo para movimiento suave sin cambiar zoom
+          mapRef.current.panTo(newPosition, {
             animate: true,
-            duration: 1.0
+            duration: 1.2,
+            easeLinearity: 0.3
           });
-          userInteractedRef.current = false; // Reset flag después del re-centrado
+          
+          // Reset flag de interacción después de un tiempo
+          setTimeout(() => {
+            userInteractedRef.current = false;
+          }, 2000);
         }
       }
     }
-  }, [latitude, longitude, shouldFlyTo]);
+  }, [latitude, longitude, shouldFlyTo, hasValidCoordinates]);
 
-  // useEffect para flyToBounds - SIEMPRE se ejecuta
+  // useEffect para flyTo - SIEMPRE se ejecuta
   useEffect(() => {
-    if (shouldFlyTo && mapRef.current) {
+    if (shouldFlyTo && mapRef.current && hasValidCoordinates) {
       const newPosition: [number, number] = [latitude, longitude];
       lastAutoMoveRef.current = Date.now();
       
-      // Si el usuario interactuó manualmente, forzar re-centrado
+      // Reset flag de interacción del usuario
       userInteractedRef.current = false;
       
-      // Usar flyToBounds de Leaflet para una animación suave y visible
-      const currentZoom = mapRef.current.getZoom();
-      const targetZoom = Math.max(18, currentZoom);
-      
-      // Crear bounds más amplios alrededor del punto para flyToBounds más visible
-      const bounds = L.latLngBounds([newPosition, newPosition]).pad(0.005);
-      
-      // Usar flyToBounds con opciones de animación más visibles
-      mapRef.current.flyToBounds(bounds, {
-        duration: 1.5, // Duración más larga para ser más visible
-        easeLinearity: 0.5, // Animación más suave
-        maxZoom: targetZoom,
+      // Usar flyTo para una animación más suave y controlada
+      mapRef.current.flyTo(newPosition, Math.max(17, mapRef.current.getZoom()), {
+        duration: 1.8,
+        easeLinearity: 0.25,
         animate: true
       });
-
-      mapRef.current.setView(newPosition, Math.max(16, mapRef.current.getZoom()), {
-            animate: true,
-            duration: 1.0
-          });
       
       // Actualizar posición del marcador con animación
       if (markerRef.current) {
         markerRef.current.setLatLng(newPosition);
         
-        // Simular animación de "drop" con CSS
+        // Animación de "drop" más sutil
         const markerElement = markerRef.current.getElement();
         if (markerElement) {
           markerElement.style.animation = 'none';
           setTimeout(() => {
-            markerElement.style.animation = 'markerDrop 1.2s ease-out';
-          }, 500); // Delay para que se vea después del flyTo
+            markerElement.style.animation = 'markerDrop 1.0s ease-out';
+          }, 300);
         }
       }
       
       // Notificar que la animación se completó
       setTimeout(() => {
         onAnimationComplete?.();
-      }, 2000); // Tiempo ajustado a la duración de la animación
+      }, 2000);
     }
-  }, [shouldFlyTo, latitude, longitude, onAnimationComplete]);
+  }, [shouldFlyTo, latitude, longitude, onAnimationComplete, hasValidCoordinates]);
 
   // useEffect para shake del marcador - SIEMPRE se ejecuta
   useEffect(() => {
@@ -508,7 +509,7 @@ const LeafletMapComponent: React.FC<{
   return (
     <MapContainer
       center={[latitude, longitude]}
-      zoom={18}
+      zoom={17}
       style={{ height: '100%', width: '100%' }}
       zoomControl={true}
       attributionControl={false}
@@ -516,9 +517,42 @@ const LeafletMapComponent: React.FC<{
       {/* Componente para manejar eventos del mapa */}
       <MapEventHandler />
       
-      {/* TileLayer con tema oscuro */}
+      {/* Mensaje de estado cuando no hay coordenadas válidas */}
+      {!hasValidCoordinates && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 1000,
+          background: 'rgba(17, 24, 39, 0.9)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        }}>
+          <div style={{ fontSize: '24px', marginBottom: '8px' }}>📍</div>
+          <div style={{ fontWeight: 600, marginBottom: '4px' }}>Esperando recibir coordenadas</div>
+          <div style={{ fontSize: '14px', color: '#D1D5DB', marginBottom: '8px' }}>
+            {isConnected ? 'Conectado - Aguardando datos GPS' : 'Conectando al dispositivo...'}
+          </div>
+          {isConnected && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <div style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
+              <span style={{ fontSize: '12px', color: '#10B981' }}>En línea</span>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* TileLayer con tema dinámico */}
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={theme === 'dark' 
+          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        }
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         subdomains="abcd"
         maxZoom={20}
@@ -621,7 +655,7 @@ const LeafletMapComponent: React.FC<{
             padding: '16px',
             borderRadius: '8px',
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            minWidth: '200px',
+            minWidth: '220px',
             border: 'none'
           }}>
             <div style={{ fontWeight: 600, marginBottom: '8px', textAlign: 'center' }}>{deviceName}</div>
@@ -630,14 +664,41 @@ const LeafletMapComponent: React.FC<{
                 <span style={{ fontWeight: 500 }}>Latitud:</span>
                 <span style={{ fontFamily: 'monospace' }}>{latitude.toFixed(6)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span style={{ fontWeight: 500 }}>Longitud:</span>
                 <span style={{ fontFamily: 'monospace' }}>{longitude.toFixed(6)}</span>
               </div>
+              {lastLocationUpdate && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 500 }}>Última actualización:</span>
+                  <span style={{ fontSize: '12px' }}>{new Date(lastLocationUpdate).toLocaleString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</span>
+                </div>
+              )}
             </div>
             <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-              <div style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
-              <span style={{ fontSize: '12px', color: '#10B981', fontWeight: 500 }}>En línea</span>
+              <div style={{ 
+                width: '8px', 
+                height: '8px', 
+                background: isConnected ? '#10B981' : '#6B7280', 
+                borderRadius: '50%', 
+                animation: isConnected ? 'pulse 2s infinite' : 'none' 
+              }}></div>
+              <span style={{ 
+                fontSize: '12px', 
+                color: isConnected ? '#10B981' : '#6B7280', 
+                fontWeight: 500 
+              }}>
+                {hasValidCoordinates 
+                  ? (isConnected ? 'En línea' : 'Datos GPS disponibles')
+                  : 'Esperando coordenadas'
+                }
+              </span>
             </div>
           </div>
         </Popup>
@@ -683,6 +744,10 @@ interface DeviceMapProps {
   isPlaying?: boolean;
   currentLocationIndex?: number;
   showProgressiveRoute?: boolean;
+  hasValidCoordinates?: boolean;
+  isConnected?: boolean;
+  lastLocationUpdate?: string | null;
+  theme?: string;
 }
 
 export const DeviceMap: React.FC<DeviceMapProps> = ({
@@ -700,7 +765,11 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
   fitToRoute = false,
   isPlaying = false,
   currentLocationIndex = 0,
-  showProgressiveRoute = false
+  showProgressiveRoute = false,
+  hasValidCoordinates = false,
+  isConnected = false,
+  lastLocationUpdate = null,
+  theme = 'dark'
 }) => {
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -785,6 +854,10 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
         isPlaying={isPlaying}
         currentLocationIndex={currentLocationIndex}
         showProgressiveRoute={showProgressiveRoute}
+        hasValidCoordinates={hasValidCoordinates}
+        isConnected={isConnected}
+        lastLocationUpdate={lastLocationUpdate}
+        theme={theme}
       />
     </div>
   );

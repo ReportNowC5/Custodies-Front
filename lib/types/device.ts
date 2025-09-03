@@ -122,3 +122,50 @@ export interface DeviceHistoryParams {
     page?: number;
     limit?: number;
 }
+
+// Tipos para el endpoint consolidado de estado del dispositivo
+export interface DeviceStatusLocation {
+    lat: number;
+    lng: number;
+    speed_kmh: number;
+    timestamp: string;
+    age_seconds: number;
+    updated_at: string;
+}
+
+export interface DeviceStatusConnection {
+    status: string;
+    connected_at: string;
+    last_activity: string;
+    disconnected_at: string | null;
+    disconnection_reason: string | null;
+    reconnection_count: number;
+    addr: string;
+    connection_duration_seconds: number;
+    disconnected_for_seconds: number | null;
+    updated_at: string;
+}
+
+export interface DeviceStatusSummary {
+    has_location: boolean;
+    has_connection_info: boolean;
+    is_connected: boolean;
+    location_is_recent: boolean;
+    overall_status: string;
+}
+
+export interface DeviceStatusData {
+    device_id: string;
+    model: string;
+    location: DeviceStatusLocation;
+    connection: DeviceStatusConnection;
+    summary: DeviceStatusSummary;
+}
+
+export interface DeviceStatusResponse {
+    data: DeviceStatusData;
+    meta: {
+        ts: number;
+        query_device_id: string;
+    };
+}

@@ -148,6 +148,10 @@ export default function AssetDetailPage() {
                 page: 1,
                 limit: 100
             });
+
+            // Ordenar por fecha descendente
+            //history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
             setLocationHistory(history);
             
             // Si hay datos, establecer las coordenadas del mapa con la ubicación más reciente
