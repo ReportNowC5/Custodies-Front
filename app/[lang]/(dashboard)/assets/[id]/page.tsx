@@ -150,7 +150,7 @@ export default function AssetDetailPage() {
             });
 
             // Ordenar por fecha descendente
-            //history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            history.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
             setLocationHistory(history);
             
