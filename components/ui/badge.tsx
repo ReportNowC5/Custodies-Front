@@ -19,7 +19,7 @@ const badgeVariants = cva(
       },
       variant: {
         outline: "border border-current bg-background  ",
-        soft: "text-current bg-opacity-10  hover:text-primary-foreground",
+        soft: "text-current bg-opacity-10",
       },
     },
     compoundVariants: [
@@ -63,38 +63,38 @@ const badgeVariants = cva(
       {
         variant: "soft",
         color: "default",
-        className: "text-primary hover:text-primary",
+        className: "text-primary",
       },
       {
         variant: "soft",
         color: "info",
-        className: "text-info hover:text-info",
+        className: "text-info",
       },
       {
         variant: "soft",
         color: "warning",
-        className: "text-warning hover:text-warning",
+        className: "text-warning",
       },
       {
         variant: "soft",
         color: "destructive",
-        className: "text-destructive hover:text-destructive",
+        className: "text-destructive",
       },
       {
         variant: "soft",
         color: "success",
-        className: "text-success hover:text-success",
+        className: "text-success",
       },
       {
         variant: "soft",
         color: "secondary",
         className:
-          "text-muted-foreground hover:text-muted-foreground !bg-opacity-50 ",
+          "text-muted-foreground !bg-opacity-50 ",
       },
       {
         variant: "soft",
         color: "default",
-        className: "text-primary hover:text-primary",
+        className: "text-primary",
       },
     ],
     defaultVariants: {
