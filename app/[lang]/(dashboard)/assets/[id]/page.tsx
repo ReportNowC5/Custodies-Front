@@ -123,8 +123,10 @@ export default function AssetDetailPage() {
     // Filtros para el historial
     const defaultDates = getDefaultDateRange();
     const [startDate, setStartDate] = useState(defaultDates.startDate);
+    const [startTime, setStartTime] = useState('00:00');
     const [endDate, setEndDate] = useState(defaultDates.endDate);
-    const [stopDuration, setStopDuration] = useState('>1 min');
+    const [endTime, setEndTime] = useState('23:59');
+    // const [stopDuration, setStopDuration] = useState('>1 min'); // Comentado temporalmente
     
     // Estados para reproducción de ruta
     const [isPlaying, setIsPlaying] = useState(false);
@@ -143,8 +145,8 @@ export default function AssetDetailPage() {
             setLoadingHistory(true);
             const history = await devicesService.getHistory({
                 deviceId,
-                from: `${from}T00:00:00Z`,
-                to: `${to}T23:59:59Z`,
+                from: from,
+                to: to,
                 page: 1,
                 limit: 100
             });
@@ -189,7 +191,9 @@ export default function AssetDetailPage() {
                         setDevice(deviceData);
                         
                         // Cargar historial inicial con fechas por defecto
-                        await loadLocationHistory(assetData.device?.imei as string, defaultDates.startDate, defaultDates.endDate);
+                        const fromDateTime = `${defaultDates.startDate}T00:00:00Z`;
+                        const toDateTime = `${defaultDates.endDate}T23:59:59Z`;
+                        await loadLocationHistory(assetData.device?.imei as string, fromDateTime, toDateTime);
                     } catch (deviceError) {
                         console.error('Error fetching device:', deviceError);
                         toast.error('Error al cargar datos del dispositivo');
@@ -209,18 +213,38 @@ export default function AssetDetailPage() {
         }
     }, [params.id]);
 
+    // Función para convertir fecha y hora local a UTC
+    const convertToUTC = (dateStr: string, timeStr: string) => {
+        const localDateTime = new Date(`${dateStr}T${timeStr}:00`);
+        return localDateTime.toISOString();
+    };
+
     const handleFilter = async () => {
         if (!device?.id) {
             toast.error('No hay dispositivo asociado');
             return;
         }
         
-        if (!startDate || !endDate) {
-            toast.error('Por favor selecciona las fechas de inicio y fin');
+        if (!startDate || !endDate || !startTime || !endTime) {
+            toast.error('Por favor completa todos los campos de fecha y hora');
             return;
         }
         
-        await loadLocationHistory(device?.imei as string, startDate, endDate);
+        // Convertir fechas locales a UTC antes de enviar al backend
+        const fromDateTimeUTC = convertToUTC(startDate, startTime);
+        const toDateTimeUTC = convertToUTC(endDate, endTime);
+        
+        // Log para debugging - mostrar conversión
+        console.log('Fechas originales:', {
+            from: `${startDate}T${startTime}:00`,
+            to: `${endDate}T${endTime}:00`
+        });
+        console.log('Fechas convertidas a UTC:', {
+            from: fromDateTimeUTC,
+            to: toDateTimeUTC
+        });
+        
+        await loadLocationHistory(device?.imei as string, fromDateTimeUTC, toDateTimeUTC);
     };
 
     const handlePlayRoute = () => {
@@ -487,26 +511,49 @@ export default function AssetDetailPage() {
                         <h3 className="text-xl font-bold text-foreground mb-6">Historial de ubicaciones</h3>
                         
                         {/* Filters */}
-                        <div className="flex flex-wrap items-end gap-4 mb-6">
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha y hora inicio</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha</label>
                                 <Input
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
                                     className="border-border"
+                                    placeholder="YYYY-MM-DD"
                                 />
                             </div>
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha y hora fin</label>
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-2 block">Hora</label>
+                                <Input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    className="border-border"
+                                    placeholder="HH:MM"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha</label>
                                 <Input
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
                                     className="border-border"
+                                    placeholder="YYYY-MM-DD"
                                 />
                             </div>
-                            <div className="flex-1 min-w-[150px]">
+                            <div>
+                                <label className="text-sm font-medium text-foreground mb-2 block">Hora</label>
+                                <Input
+                                    type="time"
+                                    value={endTime}
+                                    onChange={(e) => setEndTime(e.target.value)}
+                                    className="border-border"
+                                    placeholder="HH:MM"
+                                />
+                            </div>
+                            {/* Filtro de Paradas comentado temporalmente
+                            <div>
                                 <label className="text-sm font-medium text-foreground mb-2 block">Paradas</label>
                                 <Select value={stopDuration} onValueChange={setStopDuration}>
                                     <SelectTrigger className="border-border">
@@ -520,14 +567,17 @@ export default function AssetDetailPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <Button 
-                                onClick={handleFilter}
-                                disabled={loadingHistory || !device}
-                                className="bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90"
-                            >
-                                <Filter className="h-4 w-4 mr-2" />
-                                {loadingHistory ? 'Filtrando...' : 'Filtrar'}
-                            </Button>
+                            */}
+                            <div className="flex items-end">
+                                <Button 
+                                    onClick={handleFilter}
+                                    disabled={loadingHistory || !device}
+                                    className="bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90 w-full"
+                                >
+                                    <Filter className="h-4 w-4 mr-2" />
+                                    {loadingHistory ? 'Filtrando...' : 'Filtrar'}
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Action Buttons */}
@@ -677,11 +727,13 @@ export default function AssetDetailPage() {
                                 showRoute={locationHistory.length > 1}
                                 routeColor="#10B981"
                                 routeWeight={3}
-                                fitToRoute={!isPlaying && locationHistory.length > 1}
-                                shouldFlyTo={isPlaying}
+                                fitToRoute={false}
+                                shouldFlyTo={false}
                                 isPlaying={isPlaying}
                                 currentLocationIndex={currentLocationIndex}
                                 showProgressiveRoute={true}
+                                isHistoryView={true}
+                                theme={mode}
                             />
                             
                             {/* Playback Indicator */}

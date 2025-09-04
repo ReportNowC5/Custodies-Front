@@ -61,6 +61,13 @@ export interface DeviceResponse {
     location?: {
         latitude: number;
         longitude: number;
+    },
+    asset?: {
+        name: string;
+        serial: string;
+        model: string;
+        type: string;
+        brand: string;
     }
 }
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import {
     DropdownMenu,
@@ -45,6 +46,7 @@ const getStatusBadgeVariant = (status: string) => {
 };
 
 export const DevicesPage: React.FC = () => {
+    const router = useRouter();
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loadingCustomers, setLoadingCustomers] = useState(true);
     
@@ -232,32 +234,27 @@ export const DevicesPage: React.FC = () => {
                 const device = row.original;
                 return (
                     <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Button variant="outline" size="sm">
-                                <MoreHorizontal className="h-4 w-4 mr-1" />
-                                Acciones
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menú</span>
+                                <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem>
-                                <Link href={`/devices/${device.id}`}>
-                                    <Button variant="outline" size="sm">
-                                        <Eye className="h-4 w-4 mr-1" />
-                                        Ver detalle
-                                    </Button>
-                                </Link>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`devices/${device.id}`)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver detalle
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Button variant="outline" size="sm">
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Editar
-                                </Button>
+                            <DropdownMenuItem onClick={() => crudActions.openEditForm(device)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <Button variant="outline" size="sm">
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Eliminar
-                                </Button>
+                            <DropdownMenuItem
+                                onClick={() => crudActions.openDeleteDialog(device)}
+                                className="text-red-600"
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Eliminar
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
