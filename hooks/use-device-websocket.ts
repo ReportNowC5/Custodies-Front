@@ -12,6 +12,8 @@ interface WebSocketState {
     deviceConnectionStatus: 'connected' | 'disconnected' | 'unknown';
     deviceLastConnection: Date | null;
     deviceLastActivity: Date | null;
+    // Función para obtener la última conexión usando lógica mixta
+    getLastConnectionTime: (dbConnectionTime?: string | null) => Date | null;
 }
 
 interface UseDeviceWebSocketProps {
@@ -33,6 +35,7 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
         deviceConnectionStatus: 'unknown',
         deviceLastConnection: null,
         deviceLastActivity: null,
+        getLastConnectionTime: () => null,
     });
 
     const socketRef = useRef<Socket | null>(null);
@@ -42,6 +45,26 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
     const updateState = useCallback((updates: Partial<WebSocketState>) => {
         setState(prev => ({ ...prev, ...updates }));
     }, []);
+
+    // Función para obtener la última conexión usando lógica mixta
+    const getLastConnectionTime = useCallback((dbConnectionTime?: string | null): Date | null => {
+        // Prioridad 1: Si el dispositivo está conectado y tenemos datos del WebSocket
+        if (state.deviceConnectionStatus === 'connected' && state.deviceLastConnection) {
+            return state.deviceLastConnection;
+        }
+        
+        // Prioridad 2: Si no hay datos del WebSocket o está desconectado, usar datos de la BD
+        if (dbConnectionTime) {
+            return new Date(dbConnectionTime);
+        }
+        
+        // Prioridad 3: Fallback a la última conexión conocida del WebSocket
+        if (state.deviceLastConnection) {
+            return state.deviceLastConnection;
+        }
+        
+        return null;
+    }, [state.deviceConnectionStatus, state.deviceLastConnection]);
 
     const connect = useCallback(() => {
         if (!imei || !enabled || socketRef.current?.connected) {
@@ -82,6 +105,15 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
             // Escuchar TODOS los eventos para debug
             socket.onAny((eventName, ...args) => {
                 console.log('🎧 Evento recibido:', eventName, args);
+            });
+
+            // Manejar evento específico 'disconnected' del servidor
+            socket.on('disconnected', (data) => {
+                console.log('🔌 Evento disconnected recibido del servidor:', data);
+                updateState({
+                    deviceConnectionStatus: 'disconnected',
+                    deviceLastActivity: new Date()
+                });
             });
 
             // Evento de datos GPS recibidos (patrón original)
@@ -257,7 +289,8 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
             error: null,
             deviceConnectionStatus: 'unknown',
             deviceLastConnection: null,
-            deviceLastActivity: null
+            deviceLastActivity: null,
+            getLastConnectionTime: () => null
         });
     }, [updateState]);
 
@@ -291,5 +324,6 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
         connect,
         disconnect,
         reconnectAttempts: reconnectAttemptsRef.current,
+        getLastConnectionTime,
     };
 };

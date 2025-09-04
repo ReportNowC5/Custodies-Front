@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DeviceMap } from '@/components/devices/device-map';
 import { BatteryIndicator } from '@/components/devices/battery-indicator';
@@ -151,7 +151,8 @@ export default function DeviceDetailPage() {
         reconnectAttempts,
         deviceConnectionStatus,
         deviceLastConnection,
-        deviceLastActivity
+        deviceLastActivity,
+        getLastConnectionTime
     } = useDeviceWebSocket({
         imei: device?.imei,
         enabled: !!device?.imei
@@ -245,12 +246,19 @@ export default function DeviceDetailPage() {
         }
     }, [gpsData]);
 
-    // Actualizar última conexión cuando se conecte el dispositivo GPS real (no el websocket)
+    // Función para obtener la última conexión usando lógica mixta
+    const getEffectiveLastConnection = useCallback(() => {
+        const dbConnectionTime = deviceStatus?.data?.connection?.connected_at || null;
+        return getLastConnectionTime(dbConnectionTime);
+    }, [getLastConnectionTime, deviceStatus?.data?.connection?.connected_at]);
+
+    // Actualizar última conexión usando lógica mixta
     useEffect(() => {
-        if (deviceLastConnection) {
-            setLastConnection(deviceLastConnection.toISOString());
+        const effectiveConnection = getEffectiveLastConnection();
+        if (effectiveConnection) {
+            setLastConnection(effectiveConnection.toISOString());
         }
-    }, [deviceLastConnection]);
+    }, [getEffectiveLastConnection]);
 
     // Actualizar estado de conexión basado en datos reales del dispositivo
     const [isDeviceOnline, setIsDeviceOnline] = useState<boolean>(false);
@@ -430,9 +438,9 @@ export default function DeviceDetailPage() {
                                 {/* Indicador de estado de conexión real */}
                                 <Badge
                                     variant='outline'
-                                    className={isDeviceOnline ? 'bg-green-600 text-white px-2 py-1 text-xs' : 'bg-gray-500 text-white px-2 py-1 text-xs'}
+                                    className={isDeviceOnline ? 'bg-green-600 text-white px-2 py-1 text-xs' : 'bg-red-600 text-white px-2 py-1 text-xs'}
                                 >
-                                    <div className={`w-2 h-2 rounded-full mr-1 ${isDeviceOnline ? 'bg-green-300 animate-pulse' : 'bg-gray-300'}`}></div>
+                                    <div className={`w-2 h-2 rounded-full mr-1 ${isDeviceOnline ? 'bg-green-300 animate-pulse' : 'bg-red-300'}`}></div>
                                     {isDeviceOnline ? 'Conectado' : 'Desconectado'}
                                 </Badge>
                             </div>
@@ -474,27 +482,49 @@ export default function DeviceDetailPage() {
                             <div className="flex-1 min-w-0">
                                 <div className="text-xs lg:text-sm text-muted-foreground">Última conexión GPS</div>
                                 <div className="text-sm font-medium text-foreground truncate">
-                                    {/* Priorizar datos reales del dispositivo GPS */}
-                                    {lastConnection || deviceStatus?.data?.connection?.connected_at 
-                                        ? formatDate(lastConnection || deviceStatus?.data?.connection?.connected_at || '') 
-                                        : 'Sin conexión'}
+                                    {/* Usar lógica mixta para mostrar la última conexión */}
+                                    {(() => {
+                                        const effectiveConnection = getEffectiveLastConnection();
+                                        return effectiveConnection 
+                                            ? formatDate(effectiveConnection.toISOString())
+                                            : 'Sin conexión';
+                                    })()}
                                 </div>
-                                {/* Mostrar estado de conexión actual */}
-                                {/*{isDeviceOnline && (
+                                {/* Mostrar información adicional basada en el estado */}
+                                {isDeviceOnline && deviceConnectionStatus === 'connected' && (
                                     <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                        Dispositivo conectado
+                                        Conectado en tiempo real
                                         {deviceStatus?.data?.connection?.connection_duration_seconds && (
-                                            <span> ({deviceStatus.data.connection.connection_duration_seconds}s)</span>
+                                            <span> ({Math.floor(deviceStatus.data.connection.connection_duration_seconds / 60)}m)</span>
                                         )}
                                     </div>
-                                )}*/}
+                                )}
                                 {/* Mostrar última actividad si el dispositivo está desconectado */}
                                 {!isDeviceOnline && deviceLastActivity && (
                                     <div className="text-xs text-gray-500 mt-1">
                                         Última actividad: {formatDate(deviceLastActivity.toISOString())}
                                     </div>
                                 )}
+                                {/* Mostrar fuente de datos */}
+                                {(() => {
+                                    const wsConnection = deviceLastConnection;
+                                    const dbConnection = deviceStatus?.data?.connection?.connected_at;
+                                    if (wsConnection && deviceConnectionStatus === 'connected') {
+                                        return (
+                                            <div className="text-xs text-blue-500 mt-1">
+                                                📡 Datos en tiempo real
+                                            </div>
+                                        );
+                                    } else if (dbConnection) {
+                                        return (
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                💾 Datos de base de datos
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
                         </div>
 
