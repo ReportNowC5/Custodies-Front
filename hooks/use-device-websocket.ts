@@ -8,6 +8,10 @@ interface WebSocketState {
     error: string | null;
     lastUpdate: Date | null;
     gpsData: any | null;
+    // Estados específicos del dispositivo GPS (no del websocket)
+    deviceConnectionStatus: 'connected' | 'disconnected' | 'unknown';
+    deviceLastConnection: Date | null;
+    deviceLastActivity: Date | null;
 }
 
 interface UseDeviceWebSocketProps {
@@ -26,6 +30,9 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
         error: null,
         lastUpdate: null,
         gpsData: null,
+        deviceConnectionStatus: 'unknown',
+        deviceLastConnection: null,
+        deviceLastActivity: null,
     });
 
     const socketRef = useRef<Socket | null>(null);
@@ -79,19 +86,107 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
 
             // Evento de datos GPS recibidos (patrón original)
             socket.on('gps:packet', (data) => {
-                updateState({
+                const updates: Partial<WebSocketState> = {
                     gpsData: data,
                     lastUpdate: new Date()
-                });
+                };
+
+                // Procesar eventos de conexión/desconexión del dispositivo GPS
+                if (data && typeof data === 'object') {
+                    const eventType = data.type;
+                    const deviceStatus = data.status;
+                    
+                    // Eventos de conexión del dispositivo GPS
+                    if (eventType === 'connection' || eventType === 'login' || eventType === 'reconnection') {
+                        updates.deviceConnectionStatus = 'connected';
+                        updates.deviceLastConnection = new Date();
+                        updates.deviceLastActivity = new Date();
+                        console.log(`✅ Dispositivo GPS conectado - Evento: ${eventType}`);
+                    }
+                    
+                    // Eventos de desconexión del dispositivo GPS
+                    else if (eventType === 'disconnection') {
+                        updates.deviceConnectionStatus = 'disconnected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`❌ Dispositivo GPS desconectado - Evento: ${eventType}`);
+                    }
+                    
+                    // Estados directos del dispositivo
+                    else if (deviceStatus === 'connected') {
+                        updates.deviceConnectionStatus = 'connected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`✅ Estado del dispositivo GPS: conectado`);
+                    }
+                    else if (deviceStatus === 'disconnected') {
+                        updates.deviceConnectionStatus = 'disconnected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`❌ Estado del dispositivo GPS: desconectado`);
+                    }
+                    
+                    // Para cualquier dato GPS válido, actualizar última actividad
+                    else if (eventType === 'location' || eventType === 'status' || data.latitude || data.lat) {
+                        updates.deviceLastActivity = new Date();
+                        // Si recibimos datos GPS, asumimos que el dispositivo está conectado
+                        if (updates.deviceConnectionStatus === 'unknown') {
+                            updates.deviceConnectionStatus = 'connected';
+                        }
+                    }
+                }
+
+                updateState(updates);
             });
 
             // Escuchar evento específico del dispositivo (como en tu HTML)
             socket.on(`gps:packet:${imei}`, (data) => {
                 console.log(`📬 Datos GPS específicos para ${imei}:`, data);
-                updateState({
+                const updates: Partial<WebSocketState> = {
                     gpsData: data,
                     lastUpdate: new Date()
-                });
+                };
+
+                // Procesar eventos de conexión/desconexión del dispositivo GPS específico
+                if (data && typeof data === 'object') {
+                    const eventType = data.type;
+                    const deviceStatus = data.status;
+                    
+                    // Eventos de conexión del dispositivo GPS
+                    if (eventType === 'connection' || eventType === 'login' || eventType === 'reconnection') {
+                        updates.deviceConnectionStatus = 'connected';
+                        updates.deviceLastConnection = new Date();
+                        updates.deviceLastActivity = new Date();
+                        console.log(`✅ Dispositivo GPS ${imei} conectado - Evento: ${eventType}`);
+                    }
+                    
+                    // Eventos de desconexión del dispositivo GPS
+                    else if (eventType === 'disconnection') {
+                        updates.deviceConnectionStatus = 'disconnected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`❌ Dispositivo GPS ${imei} desconectado - Evento: ${eventType}`);
+                    }
+                    
+                    // Estados directos del dispositivo
+                    else if (deviceStatus === 'connected') {
+                        updates.deviceConnectionStatus = 'connected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`✅ Estado del dispositivo GPS ${imei}: conectado`);
+                    }
+                    else if (deviceStatus === 'disconnected') {
+                        updates.deviceConnectionStatus = 'disconnected';
+                        updates.deviceLastActivity = new Date();
+                        console.log(`❌ Estado del dispositivo GPS ${imei}: desconectado`);
+                    }
+                    
+                    // Para cualquier dato GPS válido, actualizar última actividad
+                    else if (eventType === 'location' || eventType === 'status' || data.latitude || data.lat) {
+                        updates.deviceLastActivity = new Date();
+                        // Si recibimos datos GPS, asumimos que el dispositivo está conectado
+                        if (updates.deviceConnectionStatus === 'unknown') {
+                            updates.deviceConnectionStatus = 'connected';
+                        }
+                    }
+                }
+
+                updateState(updates);
             });
 
             // Evento de desconexión
@@ -159,7 +254,10 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
         updateState({
             isConnected: false,
             isConnecting: false,
-            error: null
+            error: null,
+            deviceConnectionStatus: 'unknown',
+            deviceLastConnection: null,
+            deviceLastActivity: null
         });
     }, [updateState]);
 
