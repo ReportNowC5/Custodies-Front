@@ -263,10 +263,7 @@ export default function DeviceDetailPage() {
                 
                 // Cargar datos básicos del dispositivo
                 const deviceData = await devicesService.getById(params.id as string);
-                setDevice({
-                    ...deviceData,
-                    asset: { name: 'N/A' }
-                });
+                setDevice(deviceData);                
                 
                 // Cargar estado consolidado del dispositivo usando el IMEI
                 if (deviceData?.imei) {
@@ -496,7 +493,15 @@ export default function DeviceDetailPage() {
                             <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <div className="text-xs lg:text-sm text-muted-foreground">Activo relacionado</div>
-                                <div className="text-sm font-medium text-foreground truncate">{device.asset?.name || 'N/A'}</div>
+                                {
+                                    device.assets?.map((item) => {
+                                        return (
+                                            <div key={item.id}>
+                                                <div className="text-sm font-medium text-foreground truncate">{item.name}</div>
+                                            </div>
+                                        )
+                                    })
+                                }
                             </div>
                         </div>
 

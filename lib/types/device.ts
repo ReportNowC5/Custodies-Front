@@ -62,13 +62,24 @@ export interface DeviceResponse {
         latitude: number;
         longitude: number;
     },
-    asset?: {
+    assets?: [{
+        id: number;
         name: string;
-        serial: string;
-        model: string;
-        type: string;
-        brand: string;
-    }
+        assetType: string;
+        identifier: string;
+        status: DeviceStatus;
+        device?: {
+            id: number;
+            brand: string;
+            model: string;
+            imei: string;
+            celular: string;
+            status: DeviceStatus;
+            createdAt: string;
+            updatedAt: string;
+            deletedAt: string | null;
+        }
+    }],
 }
 
 export interface DevicesListResponse {
