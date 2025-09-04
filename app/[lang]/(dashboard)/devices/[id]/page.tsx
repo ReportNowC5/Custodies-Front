@@ -263,7 +263,10 @@ export default function DeviceDetailPage() {
                 
                 // Cargar datos básicos del dispositivo
                 const deviceData = await devicesService.getById(params.id as string);
-                setDevice(deviceData);
+                setDevice({
+                    ...deviceData,
+                    asset: { name: 'N/A' }
+                });
                 
                 // Cargar estado consolidado del dispositivo usando el IMEI
                 if (deviceData?.imei) {
@@ -453,12 +456,12 @@ export default function DeviceDetailPage() {
                                         ? formatDate(lastConnection || deviceStatus?.data?.connection?.connected_at || '') 
                                         : 'Sin conexión'}
                                 </div>
-                                {deviceStatus?.data?.summary?.is_connected && (
+                                {/*{deviceStatus?.data?.summary?.is_connected && (
                                     <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                         Conectado ({deviceStatus.data.connection.connection_duration_seconds}s)
                                     </div>
-                                )}
+                                )}*/}
                             </div>
                         </div>
 
@@ -480,11 +483,11 @@ export default function DeviceDetailPage() {
                                         )}
                                     </div>
                                 )}
-                                {deviceStatus?.data?.summary?.location_is_recent && (
+                                {/*{deviceStatus?.data?.summary?.location_is_recent && (
                                     <div className="text-xs text-green-600 mt-1">
                                         📍 Ubicación reciente ({deviceStatus.data.location.age_seconds}s)
                                     </div>
-                                )}
+                                )}*/}
                             </div>
                         </div>
 
@@ -493,7 +496,7 @@ export default function DeviceDetailPage() {
                             <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <div className="text-xs lg:text-sm text-muted-foreground">Activo relacionado</div>
-                                <div className="text-sm font-medium text-foreground truncate">trailer 2</div>
+                                <div className="text-sm font-medium text-foreground truncate">{device.asset?.name || 'N/A'}</div>
                             </div>
                         </div>
 
