@@ -148,7 +148,10 @@ export default function DeviceDetailPage() {
         error: wsError,
         lastUpdate,
         gpsData,
-        reconnectAttempts
+        reconnectAttempts,
+        deviceConnectionStatus,
+        deviceLastConnection,
+        deviceLastActivity
     } = useDeviceWebSocket({
         imei: device?.imei,
         enabled: !!device?.imei
@@ -242,12 +245,22 @@ export default function DeviceDetailPage() {
         }
     }, [gpsData]);
 
-    // Actualizar última conexión cuando se conecte el WebSocket
+    // Actualizar última conexión cuando se conecte el dispositivo GPS real (no el websocket)
     useEffect(() => {
-        if (isConnected) {
-            setLastConnection(new Date().toISOString());
+        if (deviceLastConnection) {
+            setLastConnection(deviceLastConnection.toISOString());
         }
-    }, [isConnected]);
+    }, [deviceLastConnection]);
+
+    // Actualizar estado de conexión basado en datos reales del dispositivo
+    const [isDeviceOnline, setIsDeviceOnline] = useState<boolean>(false);
+    useEffect(() => {
+        // Determinar si el dispositivo está realmente conectado
+        const isReallyConnected = deviceConnectionStatus === 'connected' || 
+                                 deviceStatus?.data?.summary?.is_connected || 
+                                 false;
+        setIsDeviceOnline(isReallyConnected);
+    }, [deviceConnectionStatus, deviceStatus?.data?.summary?.is_connected]);
 
     // Actualizar datos de batería cuando lleguen datos de estado
     useEffect(() => {
@@ -407,12 +420,22 @@ export default function DeviceDetailPage() {
                                     <div className="text-sm text-muted-foreground">{device.model}</div>
                                 </div>
                             </div>
-                            <Badge
-                                variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
-                                className={device.status === 'ACTIVE' ? 'bg-[--theme-primary] text-primary-foreground px-3 py-1' : 'bg-destructive text-destructive-foreground px-3 py-1'}
-                            >
-                                {getStatusLabel(device.status)}
-                            </Badge>
+                            <div className="flex flex-row gap-2">
+                                <Badge
+                                    variant={device.status === 'ACTIVE' ? 'soft' : 'outline'}
+                                    className={device.status === 'ACTIVE' ? 'bg-[--theme-primary] text-primary-foreground px-3 py-1' : 'bg-destructive text-destructive-foreground px-3 py-1'}
+                                >
+                                    {getStatusLabel(device.status)}
+                                </Badge>
+                                {/* Indicador de estado de conexión real */}
+                                <Badge
+                                    variant='outline'
+                                    className={isDeviceOnline ? 'bg-green-600 text-white px-2 py-1 text-xs' : 'bg-gray-500 text-white px-2 py-1 text-xs'}
+                                >
+                                    <div className={`w-2 h-2 rounded-full mr-1 ${isDeviceOnline ? 'bg-green-300 animate-pulse' : 'bg-gray-300'}`}></div>
+                                    {isDeviceOnline ? 'Conectado' : 'Desconectado'}
+                                </Badge>
+                            </div>
                         </div>
                     </div>
 
@@ -449,18 +472,29 @@ export default function DeviceDetailPage() {
                         <div className="flex items-center gap-3">
                             <Activity className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <div className="text-xs lg:text-sm text-muted-foreground">Última conexión</div>
+                                <div className="text-xs lg:text-sm text-muted-foreground">Última conexión GPS</div>
                                 <div className="text-sm font-medium text-foreground truncate">
+                                    {/* Priorizar datos reales del dispositivo GPS */}
                                     {lastConnection || deviceStatus?.data?.connection?.connected_at 
                                         ? formatDate(lastConnection || deviceStatus?.data?.connection?.connected_at || '') 
                                         : 'Sin conexión'}
                                 </div>
-                                {/*{deviceStatus?.data?.summary?.is_connected && (
+                                {/* Mostrar estado de conexión actual */}
+                                {/*{isDeviceOnline && (
                                     <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                        Conectado ({deviceStatus.data.connection.connection_duration_seconds}s)
+                                        Dispositivo conectado
+                                        {deviceStatus?.data?.connection?.connection_duration_seconds && (
+                                            <span> ({deviceStatus.data.connection.connection_duration_seconds}s)</span>
+                                        )}
                                     </div>
                                 )}*/}
+                                {/* Mostrar última actividad si el dispositivo está desconectado */}
+                                {!isDeviceOnline && deviceLastActivity && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        Última actividad: {formatDate(deviceLastActivity.toISOString())}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
