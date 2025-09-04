@@ -176,6 +176,8 @@ export default function DeviceDetailPage() {
 
     // Toast de debug para datos WebSocket recibidos
     useEffect(() => {
+        console.log('gpsData', gpsData);
+        
         if (gpsData && device?.imei) {
             let parsedData = gpsData;
             if (typeof gpsData === 'string') {
