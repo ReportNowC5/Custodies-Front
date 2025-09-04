@@ -517,12 +517,12 @@ export default function DeviceDetailPage() {
                         </div>
 
                         {/* Battery Status */}
-                        {batteryData && (
-                            <div className="flex items-center gap-3">
-                                <Battery className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-xs lg:text-sm text-muted-foreground">Carga del dispositivo</div>
-                                    <div className="mt-1">
+                        <div className="flex items-center gap-3">
+                            <Battery className="h-4 w-4 text-[--theme-primary] flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs lg:text-sm text-muted-foreground">Carga del dispositivo</div>
+                                <div className="mt-1">
+                                    {batteryData ? (
                                         <BatteryIndicator
                                             voltage={batteryData.voltage}
                                             size="sm"
@@ -530,10 +530,12 @@ export default function DeviceDetailPage() {
                                             showPercentage={true}
                                             className=""
                                         />
-                                    </div>
+                                    ) : (
+                                        <div className="text-xs text-muted-foreground">Sin datos</div>
+                                    )}
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                     
                     {/* Real-time Status Section */}
