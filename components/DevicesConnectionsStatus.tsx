@@ -12,8 +12,13 @@ export default function DevicesConnectionsStatus(props: Props) {
   const [initialStatus, setInitialStatus] = useState<{ status: 'connected' | 'disconnected'; reason?: string } | null>(null);
   const [updateCount, setUpdateCount] = useState(0);
 
-  // Usar el hook de WebSocket existente en lugar de crear uno nuevo
-  const { gpsData } = useDeviceWebSocket({
+  // Usar el hook de WebSocket existente con los nuevos campos de conexión real
+  const { 
+    gpsData, 
+    deviceConnectionStatus, 
+    deviceLastConnection, 
+    deviceLastActivity 
+  } = useDeviceWebSocket({
     imei,
     enabled: true
   });
@@ -32,12 +37,22 @@ export default function DevicesConnectionsStatus(props: Props) {
       .catch(() => {});
   }, [imei]);
 
-  // Procesar datos del WebSocket cuando cambien
+  // Actualizar estado basado en la conexión real del dispositivo GPS
   useEffect(() => {
-    if (!gpsData) return;
+    if (deviceConnectionStatus !== 'unknown') {
+      const newStatus = deviceConnectionStatus === 'connected' ? 'connected' : 'disconnected';
+      console.log(`🎯 DevicesConnectionsStatus actualizando desde hook: ${newStatus}`);
+      setDeviceStatus({ status: newStatus });
+      setUpdateCount(c => c + 1);
+    }
+  }, [deviceConnectionStatus]);
+
+  // Procesar datos del WebSocket como respaldo (solo si no tenemos estado del dispositivo)
+  useEffect(() => {
+    if (!gpsData || deviceConnectionStatus !== 'unknown') return;
     
     const pkt = Array.isArray(gpsData) ? gpsData[0] : gpsData;
-    console.log(`🎯 DevicesConnectionsStatus procesando gpsData:`, pkt);
+    console.log(`🎯 DevicesConnectionsStatus procesando gpsData como respaldo:`, pkt);
     
     let updated = false;
     if (pkt.type === 'connection' || pkt.type === 'reconnection' || pkt.type === 'login') {
@@ -67,7 +82,7 @@ export default function DevicesConnectionsStatus(props: Props) {
     if (!updated) {
       console.log(`⚠️ Evento no procesado:`, pkt);
     }
-  }, [gpsData]);
+  }, [gpsData, deviceConnectionStatus]);
 
   if (!deviceStatus) return <span className="ml-4 text-xs text-muted-foreground">Sin estado de conexión</span>;
 
