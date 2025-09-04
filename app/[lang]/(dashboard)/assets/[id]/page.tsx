@@ -50,6 +50,8 @@ import { toast } from 'sonner';
 import { useTheme } from "next-themes";
 import { useThemeStore } from "@/store";
 import { themes } from "@/config/thems";
+import { useResizableLayout } from '@/hooks/use-resizable-layout';
+import { ResizeDivider } from '@/components/ui/resize-divider';
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -138,6 +140,17 @@ export default function AssetDetailPage() {
     const { theme, setTheme, resolvedTheme: mode } = useTheme();
     const { theme: config, setTheme: setConfig } = useThemeStore();
     const newTheme = themes.find((theme) => theme.name === config);
+    
+    // Resizable layout hook
+    const {
+        panelWidth,
+        isResizing,
+        isDesktop,
+        handleResizeStart,
+        handleResizeEnd,
+        setPanelWidth,
+        validatePanelWidth
+    } = useResizableLayout();
 
     // Función para cargar historial de ubicaciones
     const loadLocationHistory = async (deviceId: string, from: string, to: string) => {
@@ -408,7 +421,12 @@ export default function AssetDetailPage() {
             {/* Main Content - Layout similar a Figma */}
             <div className="flex flex-col lg:flex-row h-[calc(100vh-73px)]">
                 {/* Left Panel - Asset Info and Location History */}
-                <div className="order-1 w-full lg:w-2/3 bg-background p-4 lg:p-6 overflow-y-auto">
+                <div 
+                    className="order-1 w-full bg-background p-4 lg:p-6 overflow-y-auto transition-all duration-200 ease-out"
+                    style={{
+                        width: isDesktop ? `${panelWidth}%` : '100%'
+                    }}
+                >
                     {/* Asset Details Card */}
                     <div className="bg-card border border-border rounded-lg shadow-sm p-6 mb-6">
                         {/* Asset Header */}
@@ -714,8 +732,23 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
 
+                {/* Resize Divider - Only visible on desktop */}
+                <ResizeDivider
+                    isResizing={isResizing}
+                    isDesktop={isDesktop}
+                    onMouseDown={handleResizeStart}
+                    onTouchStart={handleResizeStart}
+                    className="order-2"
+                />
+
                 {/* Right Panel - Map */}
-                <div className="order-2 lg:order-2 flex-1 relative h-64 lg:h-full">
+                <div 
+                    className="order-3 lg:order-3 relative h-64 lg:h-full transition-all duration-200 ease-out"
+                    style={{
+                        width: isDesktop ? `${100 - panelWidth}%` : '100%',
+                        flex: isDesktop ? 'none' : '1'
+                    }}
+                >
                     {mapLocation ? (
                         <div className="relative w-full h-full">
                             <DeviceMap
