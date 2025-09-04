@@ -24,3 +24,45 @@
 .leaflet-control-container {
   z-index: 1000;
 }
+
+/* Variables CSS para el sistema de redimensionamiento */
+:root {
+  --resize-divider-color: hsl(var(--border));
+  --resize-divider-hover: hsl(var(--primary));
+  --resize-divider-active: hsl(var(--primary));
+  --resize-shadow: hsla(var(--primary), 0.3);
+}
+
+/* Estilos para el sistema de redimensionamiento */
+.resize-divider {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.resize-divider:hover {
+  background-color: var(--resize-divider-hover);
+}
+
+.resize-divider.dragging {
+  background-color: var(--resize-divider-active);
+  box-shadow: 0 0 10px var(--resize-shadow);
+}
+
+/* Transiciones para paneles redimensionables */
+.resizable-panel {
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.resizable-panel.resizing {
+  transition: none;
+}
+
+/* Cursor personalizado durante redimensionamiento */
+body.resizing {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
