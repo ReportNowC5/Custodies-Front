@@ -355,98 +355,60 @@ const LeafletMapComponent: React.FC<{
             return (bearing + 360) % 360;
         }, []);
 
-        // Crear icono personalizado con orientación usando SVG profesional optimizado
+        // Crear icono personalizado usando el pin de ubicación proporcionado por el usuario
         const createCustomIcon = (rotation = 0) => {
-            const iconColor = isConnected ? '#10B981' : '#EF4444'; // Verde si conectado, rojo si no
-            const accentColor = isConnected ? '#059669' : '#DC2626'; // Tono más oscuro para detalles
-            const pulseColor = isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
-            const shadowColor = isConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+            const iconColor = isConnected ? '#10B981' : '#FF3D00'; // Verde si conectado, naranja/rojo si no
+            const pulseColor = isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 61, 0, 0.3)';
+            const shadowColor = isConnected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 61, 0, 0.2)';
             
             return L.divIcon({
                 html: `
         <div style="
-          width: 44px;
-          height: 44px;
+          width: 32px;
+          height: 32px;
           transform: rotate(${rotation}deg);
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           position: relative;
           filter: drop-shadow(0 2px 8px ${shadowColor});
         ">
-          <!-- SVG del vehículo moderno y elegante -->
-          <svg width="44" height="44" viewBox="0 0 44 44" style="
+          <!-- Pin de ubicación SVG -->
+          <svg width="32" height="32" viewBox="0 0 1024 1024" style="
             position: absolute;
             top: 0;
             left: 0;
-            animation: modernPulse 2.5s infinite ease-in-out;
+            animation: locationPulse 2s infinite ease-in-out;
           ">
-            <!-- Gradientes para mayor profundidad -->
             <defs>
-              <linearGradient id="vehicleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="${iconColor}" stop-opacity="1"/>
-                <stop offset="100%" stop-color="${accentColor}" stop-opacity="1"/>
-              </linearGradient>
-              <radialGradient id="glowEffect" cx="50%" cy="50%" r="50%">
+              <radialGradient id="pulseGlow" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stop-color="${pulseColor}" stop-opacity="0.8"/>
                 <stop offset="100%" stop-color="${pulseColor}" stop-opacity="0"/>
               </radialGradient>
             </defs>
             
-            <!-- Efecto de resplandor de fondo -->
-            <circle cx="22" cy="22" r="20" fill="url(#glowEffect)" opacity="0.6"/>
+            <!-- Efecto de resplandor -->
+            <circle cx="512" cy="400" r="200" fill="url(#pulseGlow)" opacity="0.6"/>
             
-            <!-- Cuerpo principal del vehículo (más moderno) -->
-            <path d="M10 28 L10 25 Q10 23 12 23 L32 23 Q34 23 34 25 L34 28 Q34 30 32 30 L12 30 Q10 30 10 28 Z" 
-                  fill="url(#vehicleGradient)" stroke="#ffffff" stroke-width="1.5" rx="2"/>
-            
-            <!-- Cabina del vehículo (diseño más aerodinámico) -->
-            <path d="M14 23 L14 18 Q14 16 16 16 L28 16 Q30 16 30 18 L30 23" 
-                  fill="url(#vehicleGradient)" stroke="#ffffff" stroke-width="1.5"/>
-            
-            <!-- Parabrisas con efecto de cristal -->
-            <path d="M16 18 L16 20 L28 20 L28 18" 
-                  fill="#E0F2FE" stroke="#ffffff" stroke-width="1" opacity="0.9"/>
-            
-            <!-- Ruedas con diseño moderno -->
-            <circle cx="16" cy="28" r="3" fill="#1F2937" stroke="#ffffff" stroke-width="1.5"/>
-            <circle cx="28" cy="28" r="3" fill="#1F2937" stroke="#ffffff" stroke-width="1.5"/>
-            
-            <!-- Llantas con detalles -->
-            <circle cx="16" cy="28" r="1.5" fill="#374151"/>
-            <circle cx="28" cy="28" r="1.5" fill="#374151"/>
-            <circle cx="16" cy="28" r="0.5" fill="#6B7280"/>
-            <circle cx="28" cy="28" r="0.5" fill="#6B7280"/>
-            
-            <!-- Faros LED modernos -->
-            <ellipse cx="14" cy="21" rx="1.5" ry="1" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="0.5"/>
-            <ellipse cx="30" cy="21" rx="1.5" ry="1" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="0.5"/>
-            
-            <!-- Indicador de dirección (flecha más elegante) -->
-            <path d="M22 6 L26 12 L18 12 Z" fill="${iconColor}" stroke="#ffffff" stroke-width="1" opacity="0.9"/>
-            
-            <!-- Punto central de referencia -->
-            <circle cx="22" cy="22" r="1.5" fill="#ffffff" stroke="${accentColor}" stroke-width="1"/>
-            
-            <!-- Detalles adicionales para mayor realismo -->
-            <rect x="20" y="19" width="4" height="1" fill="#ffffff" opacity="0.6" rx="0.5"/>
-            <rect x="19" y="25" width="6" height="0.5" fill="${accentColor}" opacity="0.7" rx="0.25"/>
+            <!-- Pin de ubicación principal -->
+            <path d="M512 85.333333c-164.949333 0-298.666667 133.738667-298.666667 298.666667 0 164.949333 298.666667 554.666667 298.666667 554.666667s298.666667-389.717333 298.666667-554.666667c0-164.928-133.717333-298.666667-298.666667-298.666667z m0 448a149.333333 149.333333 0 1 1 0-298.666666 149.333333 149.333333 0 0 1 0 298.666666z" 
+                  fill="${iconColor}" stroke="#ffffff" stroke-width="20"/>
           </svg>
           
           <style>
-            @keyframes modernPulse {
+            @keyframes locationPulse {
               0%, 100% { 
-                filter: drop-shadow(0 2px 8px ${shadowColor}) drop-shadow(0 0 0 1px ${pulseColor});
+                filter: drop-shadow(0 2px 8px ${shadowColor});
                 transform: scale(1);
               }
               50% { 
-                filter: drop-shadow(0 4px 12px ${shadowColor.replace('0.15', '0.25')}) drop-shadow(0 0 0 3px ${pulseColor});
-                transform: scale(1.05);
+                filter: drop-shadow(0 4px 12px ${shadowColor.replace('0.2', '0.4')});
+                transform: scale(1.1);
               }
             }
           </style>
         </div>
       `,
-                className: 'modern-vehicle-marker',
-                iconSize: [44, 44],
+                className: 'location-pin-marker',
+                iconSize: [32, 32],
                 iconAnchor: [22, 22],
                 popupAnchor: [0, -22]
             });

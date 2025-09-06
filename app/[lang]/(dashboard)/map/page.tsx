@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
@@ -294,6 +294,56 @@ export default function MapPage() {
         }
     }, [devicesConnectionMap, getDeviceState, isDeviceConnected]);
 
+    // Función para manejar la selección limpia de assets
+    const handleAssetSelection = useCallback((asset: AssetWithDevice) => {
+        console.log(`🎯 Seleccionando asset: ${asset.name} (ID: ${asset.id})`);
+        
+        // Si es el mismo asset, no hacer nada
+        if (selectedAsset?.id === asset.id) {
+            console.log(`⚠️ Asset ${asset.name} ya está seleccionado`);
+            return;
+        }
+        
+        // Limpiar completamente el estado del asset anterior
+        if (selectedAsset) {
+            console.log(`🧹 Limpiando datos del asset anterior: ${selectedAsset.name}`);
+            
+            // Resetear datos GPS y ubicación del asset anterior en la lista
+            setAssets(prevAssets => 
+                prevAssets.map(prevAsset => {
+                    if (prevAsset.id === selectedAsset.id) {
+                        // Mantener solo los datos históricos originales, limpiar datos en tiempo real
+                        return {
+                            ...prevAsset,
+                            // No limpiar lastLocation ni recentPoints ya que son datos históricos válidos
+                        };
+                    }
+                    return prevAsset;
+                })
+            );
+        }
+        
+        // Validar coordenadas del nuevo asset
+        if (asset.lastLocation) {
+            const { latitude, longitude } = asset.lastLocation;
+            if (typeof latitude === 'number' && typeof longitude === 'number' && 
+                !isNaN(latitude) && !isNaN(longitude) && 
+                latitude >= -90 && latitude <= 90 && 
+                longitude >= -180 && longitude <= 180) {
+                console.log(`📍 Coordenadas válidas del asset seleccionado: ${latitude}, ${longitude}`);
+            } else {
+                console.warn(`⚠️ Coordenadas inválidas para ${asset.name}:`, { latitude, longitude });
+            }
+        } else {
+            console.warn(`⚠️ Asset ${asset.name} no tiene ubicación disponible`);
+        }
+        
+        // Seleccionar el nuevo asset (esto activará el WebSocket para el nuevo IMEI)
+        setSelectedAsset(asset);
+        
+        console.log(`✅ Asset ${asset.name} seleccionado exitosamente`);
+    }, [selectedAsset]);
+
     // Efecto para limpiar datos del WebSocket cuando cambia el asset seleccionado
     useEffect(() => {
         if (selectedAsset) {
@@ -304,77 +354,101 @@ export default function MapPage() {
 
     // Efecto para actualizar la posición del asset seleccionado con datos GPS en tiempo real
     useEffect(() => {
-        if (selectedAsset && gpsData && gpsData.data) {
-            const { latitude: lat, longitude: lng, lat: altLat, lng: altLng, speed, course } = gpsData.data;
+        // Verificar que tenemos un asset seleccionado y datos GPS válidos
+        if (!selectedAsset || !gpsData || !gpsData.data) {
+            return;
+        }
+        
+        // CRÍTICO: Verificar que los datos GPS corresponden al asset seleccionado
+        const gpsDeviceId = gpsData.deviceId;
+        const selectedDeviceImei = selectedAsset.deviceDetails?.imei;
+        
+        if (!selectedDeviceImei || gpsDeviceId !== selectedDeviceImei) {
+            console.warn(`⚠️ Datos GPS ignorados: no corresponden al asset seleccionado. GPS IMEI: ${gpsDeviceId}, Asset IMEI: ${selectedDeviceImei}`);
+            return;
+        }
+        
+        console.log(`📡 Procesando datos GPS para asset seleccionado: ${selectedAsset.name} (IMEI: ${selectedDeviceImei})`);
+        
+        const { latitude: lat, longitude: lng, lat: altLat, lng: altLng, speed, course } = gpsData.data;
+        
+        // Extraer coordenadas (soportar diferentes formatos)
+        const newLatitude = lat || altLat;
+        const newLongitude = lng || altLng;
+        
+        // Validar coordenadas
+        if (!newLatitude || !newLongitude || 
+            typeof newLatitude !== 'number' || typeof newLongitude !== 'number' ||
+            isNaN(newLatitude) || isNaN(newLongitude) ||
+            newLatitude < -90 || newLatitude > 90 ||
+            newLongitude < -180 || newLongitude > 180) {
+            console.warn(`⚠️ Coordenadas GPS inválidas ignoradas:`, { newLatitude, newLongitude });
+            return;
+        }
+        
+        const newTimestamp = new Date().toISOString();
+        
+        // Crear nuevo punto GPS compatible con DeviceHistoryLocation
+        const newGpsPoint: DeviceHistoryLocation = {
+            id: Date.now(), // ID único numérico para tiempo real
+            deviceId: selectedDeviceImei,
+            latitude: newLatitude,
+            longitude: newLongitude,
+            timestamp: newTimestamp,
+            speed: speed || 0,
+            course: course || 0,
+            createdAt: newTimestamp
+        };
+        
+        // Actualizar la posición del asset seleccionado inmediatamente
+        setSelectedAsset(prevAsset => {
+            // Verificar que seguimos en el mismo asset (evitar race conditions)
+            if (!prevAsset || prevAsset.id !== selectedAsset.id) {
+                console.warn(`⚠️ Asset cambió durante actualización GPS, ignorando datos`);
+                return prevAsset;
+            }
             
-            // Extraer coordenadas (soportar diferentes formatos)
-            const newLatitude = lat || altLat;
-            const newLongitude = lng || altLng;
+            // Mantener las últimas 20 posiciones para el trazado en tiempo real
+            const currentPoints = prevAsset.recentPoints || [];
+            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
             
-            if (newLatitude && newLongitude && 
-                typeof newLatitude === 'number' && typeof newLongitude === 'number') {
-                
-                const newTimestamp = new Date().toISOString();
-                
-                // Crear nuevo punto GPS compatible con DeviceHistoryLocation
-                const newGpsPoint: DeviceHistoryLocation = {
-                    id: Date.now(), // ID único numérico para tiempo real
-                    deviceId: selectedAsset.deviceDetails?.imei || 'unknown',
+            return {
+                ...prevAsset,
+                lastLocation: {
                     latitude: newLatitude,
                     longitude: newLongitude,
-                    timestamp: newTimestamp,
-                    speed: speed || 0,
-                    course: course || 0,
-                    createdAt: newTimestamp
-                };
-                
-                // Actualizar la posición del asset seleccionado inmediatamente
-                setSelectedAsset(prevAsset => {
-                    if (!prevAsset) return prevAsset;
-                    
-                    // Mantener las últimas 20 posiciones para el trazado en tiempo real
-                    const currentPoints = prevAsset.recentPoints || [];
+                    timestamp: newTimestamp
+                },
+                recentPoints: updatedPoints
+            };
+        });
+        
+        // También actualizar en la lista de assets - SOLO el asset seleccionado
+        setAssets(prevAssets => 
+            prevAssets.map(asset => {
+                if (asset.id === selectedAsset.id) {
+                    // Mantener las últimas 20 posiciones para el trazado
+                    const currentPoints = asset.recentPoints || [];
                     const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
                     
                     return {
-                        ...prevAsset,
+                        ...asset,
                         lastLocation: {
                             latitude: newLatitude,
                             longitude: newLongitude,
                             timestamp: newTimestamp
                         },
-                        recentPoints: updatedPoints
+                        recentPoints: updatedPoints,
+                        isOnline: true // Marcar como conectado si recibimos datos GPS
                     };
-                });
-                
-                // También actualizar en la lista de assets - SOLO el asset seleccionado
-                setAssets(prevAssets => 
-                    prevAssets.map(asset => {
-                        if (asset.id === selectedAsset.id) {
-                            // Mantener las últimas 20 posiciones para el trazado
-                            const currentPoints = asset.recentPoints || [];
-                            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
-                            
-                            return {
-                                ...asset,
-                                lastLocation: {
-                                    latitude: newLatitude,
-                                    longitude: newLongitude,
-                                    timestamp: newTimestamp
-                                },
-                                recentPoints: updatedPoints,
-                                isOnline: true // Marcar como conectado si recibimos datos GPS
-                            };
-                        }
-                        // NO modificar otros assets aquí - mantener su estado actual
-                        return asset;
-                    })
-                );
-                
-                console.log(`🗺️ Posición actualizada en tiempo real: ${newLatitude}, ${newLongitude} | Puntos en trazado: ${(selectedAsset.recentPoints?.length || 0) + 1}`);
-            }
-        }
-    }, [gpsData, selectedAsset?.id]);
+                }
+                // NO modificar otros assets aquí - mantener su estado actual
+                return asset;
+            })
+        );
+        
+        console.log(`🗺️ Posición actualizada para ${selectedAsset.name}: ${newLatitude}, ${newLongitude} | Puntos: ${(selectedAsset.recentPoints?.length || 0) + 1}`);
+    }, [gpsData, selectedAsset?.id, selectedAsset?.deviceDetails?.imei]);
 
     // El WebSocket se mantiene solo para el asset seleccionado para datos en tiempo real
     // El estado de conexión de la lista se basa en la última actividad de cada dispositivo
@@ -469,12 +543,8 @@ export default function MapPage() {
                                                 : 'hover:bg-muted/50'
                                             }`}
                                         onClick={() => {
-                                            // Limpiar datos del asset anterior y seleccionar el nuevo
-                                            console.log(`🎯 Seleccionando asset: ${asset.name} (ID: ${asset.id})`);
-                                            if (asset.lastLocation) {
-                                                console.log(`📍 Coordenadas del asset seleccionado: ${asset.lastLocation.latitude}, ${asset.lastLocation.longitude}`);
-                                            }
-                                            setSelectedAsset(asset);
+                                            // Función mejorada para selección limpia de assets
+                                            handleAssetSelection(asset);
                                         }}
                                     >
                                         <div className="flex items-start justify-between mb-3">
