@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SpeedLegend } from '@/components/ui/speed-legend';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
+import { useMultipleDevicesWebSocket } from '@/hooks/use-multiple-devices-websocket';
 import { useResizableLayout } from '@/hooks/use-resizable-layout';
 import { ResizeDivider } from '@/components/ui/resize-divider';
 import {
@@ -94,6 +95,18 @@ interface AssetWithDevice extends AssetResponse {
     recentPoints?: DeviceHistoryLocation[];
 }
 
+// Función para determinar si un dispositivo está conectado basado en su última actividad (fallback)
+const isDeviceConnectedFallback = (lastLocation?: { timestamp: string }) => {
+    if (!lastLocation?.timestamp) return false;
+    
+    const lastActivity = new Date(lastLocation.timestamp);
+    const now = new Date();
+    const diffInMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
+    
+    // Considerar conectado si tuvo actividad en los últimos 30 minutos
+    return diffInMinutes <= 30;
+};
+
 export default function MapPage() {
     const router = useRouter();
     const [assets, setAssets] = useState<AssetWithDevice[]>([]);
@@ -117,7 +130,23 @@ export default function MapPage() {
         validatePanelWidth
     } = useResizableLayout();
 
-    // WebSocket para el activo seleccionado
+    // WebSocket para múltiples dispositivos
+    const deviceImeis = assets
+        .filter(asset => asset.deviceDetails?.imei)
+        .map(asset => asset.deviceDetails!.imei!);
+    
+    const {
+        isSocketConnected,
+        devices: devicesConnectionMap,
+        isDeviceConnected,
+        getDeviceState,
+        error: multiWsError
+    } = useMultipleDevicesWebSocket({
+        imeis: deviceImeis,
+        enabled: deviceImeis.length > 0
+    });
+
+    // WebSocket para el activo seleccionado (datos GPS en tiempo real)
     const {
         isConnected,
         isConnecting,
@@ -173,6 +202,13 @@ export default function MapPage() {
                                                 longitude: latest.longitude,
                                                 timestamp: latest.timestamp
                                             };
+                                            
+                                            // El estado de conexión se actualizará con el WebSocket múltiple
+                                            // Por ahora usar fallback basado en timestamp
+                                            enrichedAsset.isOnline = isDeviceConnectedFallback(enrichedAsset.lastLocation);
+                                        } else {
+                                            // Sin datos recientes = desconectado
+                                            enrichedAsset.isOnline = false;
                                         }
                                     } catch (historyError) {
                                         console.warn(`Error loading history for device ${deviceDetails.imei}:`, historyError);
@@ -207,15 +243,28 @@ export default function MapPage() {
         fetchAssetsWithDevices();
     }, []);
 
-    // Actualizar estado de conexión basado en WebSocket
+    // Efecto para actualizar el estado de conexión de los assets con datos del WebSocket múltiple
     useEffect(() => {
-        if (selectedAsset && deviceConnectionStatus) {
-            setSelectedAsset(prev => prev ? {
-                ...prev,
-                isOnline: deviceConnectionStatus === 'connected'
-            } : null);
+        if (assets.length > 0 && devicesConnectionMap.size > 0) {
+            setAssets(prevAssets => 
+                prevAssets.map(asset => {
+                    if (asset.deviceDetails?.imei) {
+                        const deviceState = getDeviceState(asset.deviceDetails.imei);
+                        const isConnectedViaWS = isDeviceConnected(asset.deviceDetails.imei);
+                        
+                        return {
+                            ...asset,
+                            isOnline: deviceState ? deviceState.isConnected : (asset.isOnline || false)
+                        };
+                    }
+                    return asset;
+                })
+            );
         }
-    }, [deviceConnectionStatus, selectedAsset?.id]);
+    }, [devicesConnectionMap, assets.length, getDeviceState, isDeviceConnected]);
+
+    // El WebSocket se mantiene solo para el asset seleccionado para datos en tiempo real
+    // El estado de conexión de la lista se basa en la última actividad de cada dispositivo
 
     if (loading) {
         return (
@@ -330,12 +379,12 @@ export default function MapPage() {
                                                         {asset.isOnline ? (
                                                             <>
                                                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                                                <span className="text-xs text-green-600 font-medium">En línea</span>
+                                                                <span className="text-xs text-green-600 font-medium">Conectado</span>
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                                                <span className="text-xs text-red-600 font-medium">Fuera de línea</span>
+                                                                <span className="text-xs text-red-600 font-medium">Desconectado</span>
                                                             </>
                                                         )}
                                                     </div>
@@ -420,7 +469,10 @@ export default function MapPage() {
                                 showProgressiveRoute={false}
                                 isHistoryView={false}
                                 hasValidCoordinates={true}
-                                isConnected={selectedAsset.isOnline || false}
+                                isConnected={selectedAsset?.deviceDetails?.imei ? 
+                            (isDeviceConnected(selectedAsset.deviceDetails.imei) || selectedAsset.isOnline || false) : 
+                            (selectedAsset?.isOnline || false)
+                        }
                                 lastLocationUpdate={selectedAsset.lastLocation.timestamp}
                                 theme={mode}
                             />
@@ -436,20 +488,28 @@ export default function MapPage() {
                             <div className="absolute top-4 left-4 z-10">
                                 <Card className="p-3 bg-card/95 backdrop-blur-sm border border-border shadow-lg">
                                     <div className="flex items-center gap-2">
-                                        {selectedAsset.isOnline ? (
-                                            <>
-                                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                                                <span className="text-sm font-medium text-green-600">En línea</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                                                <span className="text-sm font-medium text-red-600">Fuera de línea</span>
-                                            </>
-                                        )}
+                                        {(selectedAsset?.deviceDetails?.imei ? 
+                            isDeviceConnected(selectedAsset.deviceDetails.imei) : 
+                            selectedAsset?.isOnline
+                        ) ? (
+                            <>
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium text-green-600">Conectado</span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span className="text-sm font-medium text-red-600">Desconectado</span>
+                            </>
+                        )}
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">
                                         {selectedAsset.recentPoints?.length || 0} puntos GPS hoy
+                                        {selectedAsset.lastLocation && (
+                                            <div className="mt-1">
+                                                Última actividad: {new Date(selectedAsset.lastLocation.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        )}
                                     </div>
                                 </Card>
                             </div>
