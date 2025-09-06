@@ -766,7 +766,25 @@ const LeafletMapComponent: React.FC<{
 
         // useEffect para actualizar posición y orientación con throttling optimizado - SIEMPRE se ejecuta
         useEffect(() => {
+            console.log('🔍 DEBUG DeviceMap useEffect triggered:', {
+                latitude,
+                longitude,
+                hasValidCoordinates,
+                isHistoryView,
+                deviceName,
+                hasMap: !!mapRef.current,
+                hasMarker: !!markerRef.current,
+                timestamp: new Date().toISOString()
+            });
+            
             if (mapRef.current && markerRef.current && hasValidCoordinates) {
+                console.log('🔍 DEBUG DeviceMap: Actualizando posición del marcador:', {
+                    from: markerRef.current.getLatLng(),
+                    to: [latitude, longitude],
+                    isHistoryView,
+                    shouldFlyTo
+                });
+                
                 // Actualizar timestamp de última actualización real
                 lastUpdateTimeRef.current = Date.now();
                 
@@ -776,9 +794,12 @@ const LeafletMapComponent: React.FC<{
                 // Aplicar throttling inteligente
                 const shouldUpdate = isHistoryView ? throttlerRef.current.shouldUpdate() : true; // Siempre actualizar en tiempo real
                 
+                console.log('🔍 DEBUG DeviceMap: shouldUpdate =', shouldUpdate);
+                
                 if (shouldUpdate) {
                     // Usar interpolación suave para tiempo real
                     if (!isHistoryView) {
+                        console.log('🔍 DEBUG DeviceMap: Usando updateMarkerPositionSmooth para tiempo real');
                         updateMarkerPositionSmooth(latitude, longitude);
                         
                         // Iniciar predicción para futuras pérdidas de señal
@@ -786,6 +807,7 @@ const LeafletMapComponent: React.FC<{
                             startPredictiveUpdates();
                         }, 1000);
                     } else {
+                        console.log('🔍 DEBUG DeviceMap: Usando animación CSS para historial');
                         // Para vista de historial, usar animación CSS más simple
                         const newPosition: [number, number] = [latitude, longitude];
                         const markerElement = markerRef.current.getElement();
@@ -804,6 +826,7 @@ const LeafletMapComponent: React.FC<{
 
                     // Centrado automático suave SOLO para vista en tiempo real (no historial)
                     if (!shouldFlyTo && !isHistoryView && !userInteractedRef.current && !isAnimatingRef.current) {
+                        console.log('🔍 DEBUG DeviceMap: Centrando mapa automáticamente');
                         lastAutoMoveRef.current = Date.now();
 
                         // Usar panTo para movimiento suave sin cambiar zoom
@@ -818,7 +841,15 @@ const LeafletMapComponent: React.FC<{
                             userInteractedRef.current = false;
                         }, 1500);
                     }
+                } else {
+                    console.log('🔍 DEBUG DeviceMap: Actualización omitida por throttling');
                 }
+            } else {
+                console.log('🔍 DEBUG DeviceMap: Condiciones no cumplidas:', {
+                    hasMap: !!mapRef.current,
+                    hasMarker: !!markerRef.current,
+                    hasValidCoordinates
+                });
             }
         }, [latitude, longitude, shouldFlyTo, hasValidCoordinates, isPlaying, isHistoryView, updateMarkerPositionSmooth, stopPredictiveUpdates, startPredictiveUpdates]);
 

@@ -9,6 +9,8 @@ interface DeviceConnectionState {
     lastConnection: Date | null;
     lastActivity: Date | null;
     gpsData: any | null;
+    connectionAttempts: number;
+    maxAttemptsReached: boolean;
 }
 
 interface MultipleDevicesWebSocketState {
@@ -27,7 +29,7 @@ interface UseMultipleDevicesWebSocketProps {
 // URLs de WebSocket con fallback
 const PRIMARY_SOCKET_URL = 'wss://gps.dxplus.org/gps';
 const FALLBACK_SOCKET_URL = 'ws://localhost:8081/gps'; // Fallback local
-const MAX_RECONNECT_ATTEMPTS = 5; // Aumentado para mejor recuperación
+const MAX_RECONNECT_ATTEMPTS = 10; // Límite de 10 intentos como solicita el usuario
 const CONNECTION_TIMEOUT = 5000; // Aumentado a 5s para conexiones más estables
 const RECONNECT_DELAY = 1000; // Aumentado a 1s para evitar spam de reconexión
 
@@ -43,6 +45,12 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
     const socketRef = useRef<Socket | null>(null);
     const reconnectAttemptsRef = useRef(0);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const stateRef = useRef(state);
+
+    // Actualizar ref cuando cambie el estado
+    useEffect(() => {
+        stateRef.current = state;
+    }, [state]);
 
     const updateState = useCallback((updates: Partial<MultipleDevicesWebSocketState>) => {
         setState(prev => ({ ...prev, ...updates }));
@@ -58,6 +66,8 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                 lastConnection: null,
                 lastActivity: null,
                 gpsData: null,
+                connectionAttempts: 0,
+                maxAttemptsReached: false,
             };
             
             newDevices.set(imei, { ...currentDevice, ...deviceUpdates });
@@ -86,8 +96,25 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
         return Array.from(state.devices.values());
     }, [state.devices]);
 
+    // Función para verificar si un dispositivo ha alcanzado el máximo de intentos
+    const hasReachedMaxAttempts = useCallback((imei: string): boolean => {
+        const device = state.devices.get(imei);
+        return device?.maxAttemptsReached || false;
+    }, [state.devices]);
+
     const connect = useCallback((useFallback = false) => {
         if (!enabled || imeis.length === 0 || socketRef.current?.connected) {
+            return;
+        }
+
+        // Verificar si todos los dispositivos han alcanzado el máximo de intentos
+        const activeImeis = imeis.filter(imei => {
+            const device = stateRef.current.devices.get(imei);
+            return !device?.maxAttemptsReached;
+        });
+
+        if (activeImeis.length === 0) {
+            console.log('❌ Todos los dispositivos han alcanzado el máximo de intentos. No se intentará reconectar.');
             return;
         }
 
@@ -185,7 +212,7 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                         updates.isConnected = false;
                     } else if (processedData.type === 'location' || processedData.type === 'status' || data.latitude || data.lat) {
                         // Si recibimos datos GPS válidos, asumimos que está conectado
-                        const currentDevice = state.devices.get(data.deviceId);
+                        const currentDevice = stateRef.current.devices.get(data.deviceId);
                         if (!currentDevice || currentDevice.connectionStatus === 'unknown') {
                             updates.connectionStatus = 'connected';
                             updates.isConnected = true;
@@ -235,7 +262,7 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                             updates.isConnected = false;
                         } else if (processedData.type === 'location' || processedData.type === 'status' || data.latitude || data.lat) {
                             // Si recibimos datos GPS válidos, asumimos que está conectado
-                            const currentDevice = state.devices.get(imei);
+                            const currentDevice = stateRef.current.devices.get(imei);
                             if (!currentDevice || currentDevice.connectionStatus === 'unknown') {
                                 updates.connectionStatus = 'connected';
                                 updates.isConnected = true;
@@ -294,12 +321,25 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                     error: `Reconectando... intento ${attemptNumber}/${MAX_RECONNECT_ATTEMPTS}`
                 });
 
-                if (attemptNumber > MAX_RECONNECT_ATTEMPTS) {
-                    console.error('❌ Demasiados intentos de reconexión. Abortando.');
+                if (attemptNumber >= MAX_RECONNECT_ATTEMPTS) {
+                    console.error('❌ Máximo de 10 intentos alcanzado. Deteniendo reconexión.');
                     socket.disconnect();
+                    
+                    // Marcar todos los dispositivos como que alcanzaron el máximo de intentos
+                    imeis.forEach(imei => {
+                        if (imei) {
+                            updateDeviceState(imei, {
+                                connectionAttempts: MAX_RECONNECT_ATTEMPTS,
+                                maxAttemptsReached: true,
+                                connectionStatus: 'disconnected',
+                                isConnected: false
+                            });
+                        }
+                    });
+                    
                     updateState({
                         isConnecting: false,
-                        error: 'No se pudo establecer conexión después de varios intentos'
+                        error: 'No se pudo establecer conexión después de 10 intentos. Dispositivos deshabilitados.'
                     });
                 }
             });
@@ -328,7 +368,7 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                 error: 'Error al inicializar conexión WebSocket'
             });
         }
-    }, [imeis, enabled, updateState, updateDeviceState, state.devices]);
+    }, [imeis, enabled, updateState, updateDeviceState]);
 
     const disconnect = useCallback(() => {
         if (socketRef.current) {
@@ -382,6 +422,7 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
         getDeviceState,
         isDeviceConnected,
         getAllDevicesStates,
+        hasReachedMaxAttempts,
         reconnectAttempts: reconnectAttemptsRef.current,
     };
 };

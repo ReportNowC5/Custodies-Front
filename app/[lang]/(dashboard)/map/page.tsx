@@ -356,12 +356,27 @@ export default function MapPage() {
     useEffect(() => {
         // Verificar que tenemos un asset seleccionado y datos GPS válidos
         if (!selectedAsset || !gpsData || !gpsData.data) {
+            if (!selectedAsset) {
+                console.log('🔍 DEBUG: No hay asset seleccionado');
+            } else if (!gpsData) {
+                console.log('🔍 DEBUG: No hay datos GPS del WebSocket');
+            } else if (!gpsData.data) {
+                console.log('🔍 DEBUG: Datos GPS sin contenido:', gpsData);
+            }
             return;
         }
         
         // CRÍTICO: Verificar que los datos GPS corresponden al asset seleccionado
         const gpsDeviceId = gpsData.deviceId;
         const selectedDeviceImei = selectedAsset.deviceDetails?.imei;
+        
+        console.log('🔍 DEBUG WebSocket GPS:', {
+            gpsDeviceId,
+            selectedDeviceImei,
+            gpsData: gpsData.data,
+            selectedAssetName: selectedAsset.name,
+            timestamp: new Date().toISOString()
+        });
         
         if (!selectedDeviceImei || gpsDeviceId !== selectedDeviceImei) {
             console.warn(`⚠️ Datos GPS ignorados: no corresponden al asset seleccionado. GPS IMEI: ${gpsDeviceId}, Asset IMEI: ${selectedDeviceImei}`);
@@ -370,11 +385,20 @@ export default function MapPage() {
         
         console.log(`📡 Procesando datos GPS para asset seleccionado: ${selectedAsset.name} (IMEI: ${selectedDeviceImei})`);
         
-        const { latitude: lat, longitude: lng, lat: altLat, lng: altLng, speed, course } = gpsData.data;
+        const { latitude: lat, longitude: lng, lat: altLat, lng: altLng, speed, course, rumbo } = gpsData.data;
         
         // Extraer coordenadas (soportar diferentes formatos)
         const newLatitude = lat || altLat;
         const newLongitude = lng || altLng;
+        const newCourse = course || rumbo;
+        
+        console.log('🔍 DEBUG Coordenadas extraídas:', {
+            newLatitude,
+            newLongitude,
+            newCourse,
+            speed,
+            originalData: gpsData.data
+        });
         
         // Validar coordenadas
         if (!newLatitude || !newLongitude || 
@@ -396,9 +420,11 @@ export default function MapPage() {
             longitude: newLongitude,
             timestamp: newTimestamp,
             speed: speed || 0,
-            course: course || 0,
+            course: newCourse || 0,
             createdAt: newTimestamp
         };
+        
+        console.log('🔍 DEBUG Nuevo punto GPS creado:', newGpsPoint);
         
         // Actualizar la posición del asset seleccionado inmediatamente
         setSelectedAsset(prevAsset => {
@@ -412,7 +438,7 @@ export default function MapPage() {
             const currentPoints = prevAsset.recentPoints || [];
             const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
             
-            return {
+            const updatedAsset = {
                 ...prevAsset,
                 lastLocation: {
                     latitude: newLatitude,
@@ -421,6 +447,15 @@ export default function MapPage() {
                 },
                 recentPoints: updatedPoints
             };
+            
+            console.log('🔍 DEBUG Asset actualizado:', {
+                assetName: updatedAsset.name,
+                newLocation: updatedAsset.lastLocation,
+                totalPoints: updatedPoints.length,
+                previousLocation: prevAsset.lastLocation
+            });
+            
+            return updatedAsset;
         });
         
         // También actualizar en la lista de assets - SOLO el asset seleccionado
@@ -641,33 +676,36 @@ export default function MapPage() {
                         flex: isDesktop ? 'none' : '1'
                     }}
                 >
-                    {selectedAsset?.lastLocation && 
-                     typeof selectedAsset.lastLocation.latitude === 'number' && 
-                     typeof selectedAsset.lastLocation.longitude === 'number' && 
-                     !isNaN(selectedAsset.lastLocation.latitude) && 
-                     !isNaN(selectedAsset.lastLocation.longitude) ? (
+                    {selectedAsset && (
+                            // Caso 1: Tiene ubicación válida en lastLocation
+                            (selectedAsset.lastLocation && selectedAsset.lastLocation.latitude && selectedAsset.lastLocation.longitude) ||
+                            // Caso 2: No hay historial pero sí datos GPS del WebSocket
+                            (!selectedAsset.lastLocation?.latitude && gpsData?.data?.latitude && gpsData?.data?.longitude && 
+                             selectedAsset?.deviceDetails?.imei === gpsData?.deviceId)
+                        ) ? (
                         <div className="relative w-full h-full">
                             <DeviceMap
-                                latitude={selectedAsset.lastLocation.latitude}
-                                longitude={selectedAsset.lastLocation.longitude}
+                                key={`${selectedAsset.id}-${selectedAsset.lastLocation?.timestamp || Date.now()}-${selectedAsset.lastLocation?.latitude || gpsData?.data?.latitude}-${selectedAsset.lastLocation?.longitude || gpsData?.data?.longitude}`}
+                                latitude={selectedAsset.lastLocation?.latitude || gpsData?.data?.latitude || 0}
+                                longitude={selectedAsset.lastLocation?.longitude || gpsData?.data?.longitude || 0}
                                 deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand || 'N/A'} ${selectedAsset.deviceDetails?.model || 'N/A'})`}
                                 className="w-full h-full"
                                 historyLocations={selectedAsset.recentPoints || []}
                                 showRoute={true} // Siempre mostrar ruta para trazado en tiempo real
-                                routeColor="#10B981"
-                                routeWeight={4} // Línea más gruesa para mejor visibilidad
+                                routeColor="#10B981" // Verde para tiempo real
+                                routeWeight={5} // Línea más gruesa para mejor visibilidad en tiempo real
                                 fitToRoute={false}
-                                shouldFlyTo={true} // Activar flyTo para centrar en el asset seleccionado
+                                shouldFlyTo={false} // Desactivar flyTo para evitar saltos bruscos en tiempo real
                                 isPlaying={false}
-                                currentLocationIndex={0}
+                                currentLocationIndex={selectedAsset.recentPoints?.length || 0}
                                 showProgressiveRoute={false}
-                                isHistoryView={false}
+                                isHistoryView={false} // Modo tiempo real, no historial
                                 hasValidCoordinates={true}
                                 isConnected={selectedAsset?.deviceDetails?.imei ? 
                             (isDeviceConnected(selectedAsset.deviceDetails.imei) || selectedAsset.isOnline || false) : 
                             (selectedAsset?.isOnline || false)
                         }
-                                lastLocationUpdate={selectedAsset.lastLocation.timestamp}
+                                lastLocationUpdate={selectedAsset.lastLocation?.timestamp}
                                 theme={mode}
                                 currentBearing={gpsData?.data?.course || gpsData?.data?.rumbo}
                             />
@@ -716,7 +754,13 @@ export default function MapPage() {
                                         {selectedAsset.name}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                        {selectedAsset.lastLocation.latitude.toFixed(6)}, {selectedAsset.lastLocation.longitude.toFixed(6)}
+                                        {selectedAsset.lastLocation?.latitude ? 
+                                            `${selectedAsset.lastLocation.latitude.toFixed(6)}, ${selectedAsset.lastLocation.longitude.toFixed(6)}` :
+                                            (gpsData?.data?.latitude ? 
+                                                `${gpsData.data.latitude.toFixed(6)}, ${gpsData.data.longitude.toFixed(6)}` :
+                                                'Sin coordenadas'
+                                            )
+                                        }
                                     </div>
                                     {(gpsData?.data?.course || gpsData?.data?.rumbo) && (
                                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -725,7 +769,13 @@ export default function MapPage() {
                                         </div>
                                     )}
                                     <div className="text-xs text-muted-foreground mt-1">
-                                        Última actualización: {formatDate(selectedAsset.lastLocation.timestamp)}
+                                        Última actualización: {selectedAsset.lastLocation?.timestamp ? 
+                                            formatDate(selectedAsset.lastLocation.timestamp) : 
+                                            'Sin datos'
+                                        }
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        🔄 Tiempo real: {isConnected ? 'Activo' : 'Inactivo'} | WebSocket: {gpsData ? '✅' : '❌'}
                                     </div>
                                 </Card>
                             </div>
