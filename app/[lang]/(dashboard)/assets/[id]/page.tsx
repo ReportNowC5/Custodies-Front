@@ -39,7 +39,6 @@ import {
     Play,
     Pause,
     Square,
-    Save,
     Filter,
     Clock,
     Navigation,
@@ -52,6 +51,7 @@ import { useThemeStore } from "@/store";
 import { themes } from "@/config/thems";
 import { useResizableLayout } from '@/hooks/use-resizable-layout';
 import { ResizeDivider } from '@/components/ui/resize-divider';
+import { SpeedLegend } from '@/components/ui/speed-legend';
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -104,12 +104,16 @@ const formatHistoryDate = (dateString: string) => {
     });
 };
 
-// Función para obtener fechas por defecto (últimos 7 días)
+// Función para obtener fechas por defecto (día actual)
 const getDefaultDateRange = () => {
     const now = new Date();
-    const endDate = now.toISOString().split('T')[0]; // Hoy
-    const startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // Hace 7 días
-    return { startDate, endDate };
+    const currentDate = now.toISOString().split('T')[0]; // Día actual
+    return { 
+        startDate: currentDate, 
+        endDate: currentDate,
+        startTime: '00:00',
+        endTime: '23:59'
+    };
 };
 
 export default function AssetDetailPage() {
@@ -125,9 +129,9 @@ export default function AssetDetailPage() {
     // Filtros para el historial
     const defaultDates = getDefaultDateRange();
     const [startDate, setStartDate] = useState(defaultDates.startDate);
-    const [startTime, setStartTime] = useState('00:00');
+    const [startTime, setStartTime] = useState(defaultDates.startTime);
     const [endDate, setEndDate] = useState(defaultDates.endDate);
-    const [endTime, setEndTime] = useState('23:59');
+    const [endTime, setEndTime] = useState(defaultDates.endTime);
     // const [stopDuration, setStopDuration] = useState('>1 min'); // Comentado temporalmente
     
     // Estados para reproducción de ruta
@@ -161,7 +165,7 @@ export default function AssetDetailPage() {
                 from: from,
                 to: to,
                 page: 1,
-                limit: 100
+                limit: 500
             });
 
             // Ordenar por fecha descendente
@@ -267,7 +271,7 @@ export default function AssetDetailPage() {
         }
         
         if (isPlaying) {
-            // Pausar reproducción
+            // Pausar reproducción - mantener posición actual
             setIsPlaying(false);
             if (playbackInterval) {
                 clearInterval(playbackInterval);
@@ -275,9 +279,13 @@ export default function AssetDetailPage() {
             }
             toast.info('Reproducción pausada');
         } else {
-            // Iniciar reproducción
+            // Iniciar/reanudar reproducción - solo reiniciar si está al final
             setIsPlaying(true);
-            setCurrentLocationIndex(0);
+            
+            // Solo reiniciar si estamos al final del recorrido
+            if (currentLocationIndex >= locationHistory.length - 1) {
+                setCurrentLocationIndex(0);
+            }
             
             const interval = setInterval(() => {
                 setCurrentLocationIndex(prevIndex => {
@@ -288,15 +296,16 @@ export default function AssetDetailPage() {
                         clearInterval(interval);
                         setPlaybackInterval(null);
                         toast.success('Reproducción completada');
-                        return 0;
+                        return locationHistory.length - 1; // Mantener en el último punto
                     }
                     return nextIndex;
                 });
             }, 2000 / playbackSpeed); // Velocidad ajustable
             
             setPlaybackInterval(interval);
-            toast.success('Reproduciendo ruta', {
-                description: `Iniciando reproducción de ${locationHistory.length} puntos`
+            const action = currentLocationIndex === 0 ? 'Iniciando' : 'Reanudando';
+            toast.success(`${action} reproducción`, {
+                description: `${action} desde punto ${currentLocationIndex + 1} de ${locationHistory.length}`
             });
         }
     };
@@ -314,7 +323,7 @@ export default function AssetDetailPage() {
     const handleSpeedChange = (speed: number) => {
         setPlaybackSpeed(speed);
         if (isPlaying && playbackInterval) {
-            // Reiniciar el intervalo con la nueva velocidad
+            // Reiniciar el intervalo con la nueva velocidad manteniendo posición
             clearInterval(playbackInterval);
             const newInterval = setInterval(() => {
                 setCurrentLocationIndex(prevIndex => {
@@ -324,7 +333,7 @@ export default function AssetDetailPage() {
                         clearInterval(newInterval);
                         setPlaybackInterval(null);
                         toast.success('Reproducción completada');
-                        return 0;
+                        return locationHistory.length - 1; // Mantener en el último punto
                     }
                     return nextIndex;
                 });
@@ -342,17 +351,7 @@ export default function AssetDetailPage() {
         };
     }, [playbackInterval]);
 
-    const handleSaveRoute = () => {
-        if (locationHistory.length === 0) {
-            toast.error('No hay datos de ubicación para guardar');
-            return;
-        }
-        
-        toast.success('Guardando recorrido', {
-            description: `Guardando recorrido con ${locationHistory.length} puntos`
-        });
-        // TODO: Implementar lógica de guardado de recorrido
-    };
+
 
     if (loading) {
         return (
@@ -529,45 +528,45 @@ export default function AssetDetailPage() {
                         <h3 className="text-xl font-bold text-foreground mb-6">Historial de ubicaciones</h3>
                         
                         {/* Filters */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground block">Fecha inicio</label>
                                 <Input
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
-                                    className="border-border"
-                                    placeholder="YYYY-MM-DD"
+                                    className="border-border h-10 text-sm focus:ring-2 focus:ring-[--theme-primary]/20"
+                                    placeholder="Fecha de inicio"
                                 />
                             </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-2 block">Hora</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground block">Hora inicio</label>
                                 <Input
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
-                                    className="border-border"
-                                    placeholder="HH:MM"
+                                    className="border-border h-10 text-sm focus:ring-2 focus:ring-[--theme-primary]/20"
+                                    placeholder="Hora de inicio"
                                 />
                             </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-2 block">Fecha</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground block">Fecha fin</label>
                                 <Input
                                     type="date"
                                     value={endDate}
                                     onChange={(e) => setEndDate(e.target.value)}
-                                    className="border-border"
-                                    placeholder="YYYY-MM-DD"
+                                    className="border-border h-10 text-sm focus:ring-2 focus:ring-[--theme-primary]/20"
+                                    placeholder="Fecha de fin"
                                 />
                             </div>
-                            <div>
-                                <label className="text-sm font-medium text-foreground mb-2 block">Hora</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-foreground block">Hora fin</label>
                                 <Input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
-                                    className="border-border"
-                                    placeholder="HH:MM"
+                                    className="border-border h-10 text-sm focus:ring-2 focus:ring-[--theme-primary]/20"
+                                    placeholder="Hora de fin"
                                 />
                             </div>
                             {/* Filtro de Paradas comentado temporalmente
@@ -586,11 +585,11 @@ export default function AssetDetailPage() {
                                 </Select>
                             </div>
                             */}
-                            <div className="flex items-end">
+                            <div className="space-y-2 sm:flex sm:items-end sm:space-y-0">
                                 <Button 
                                     onClick={handleFilter}
                                     disabled={loadingHistory || !device}
-                                    className="bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90 w-full"
+                                    className="bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90 w-full h-10 text-sm font-medium"
                                 >
                                     <Filter className="h-4 w-4 mr-2" />
                                     {loadingHistory ? 'Filtrando...' : 'Filtrar'}
@@ -622,15 +621,7 @@ export default function AssetDetailPage() {
                                     Detener
                                 </Button>
                                 
-                                <Button 
-                                    variant="outline" 
-                                    onClick={handleSaveRoute}
-                                    disabled={locationHistory.length === 0}
-                                    className="border-[--theme-primary] text-[--theme-primary] hover:bg-[--theme-primary] hover:text-primary-foreground"
-                                >
-                                    <Save className="h-4 w-4 mr-2" />
-                                    Guardar recorrido
-                                </Button>
+
                             </div>
                             
                             {/* Speed Controls and Progress */}
@@ -777,6 +768,13 @@ export default function AssetDetailPage() {
                                     <span className="text-xs opacity-80">
                                         {currentLocationIndex + 1}/{locationHistory.length}
                                     </span>
+                                </div>
+                            )}
+                            
+                            {/* Speed Legend */}
+                            {locationHistory.length > 0 && (
+                                <div className="absolute top-4 right-4 z-10">
+                                    <SpeedLegend compact={true} className="bg-card/95 backdrop-blur-sm border border-border shadow-lg" />
                                 </div>
                             )}
                             

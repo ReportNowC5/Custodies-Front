@@ -107,11 +107,10 @@ const LeafletMapComponent: React.FC<{
 
         // Función para obtener color según la velocidad
         const getSpeedColor = useCallback((speed: number) => {
-            if (speed <= 0) return '#6B7280'; // Gris para parado
-            if (speed <= 20) return '#10B981'; // Verde para velocidad baja
-            if (speed <= 50) return '#F59E0B'; // Amarillo para velocidad media
-            if (speed <= 80) return '#EF4444'; // Rojo para velocidad alta
-            return '#DC2626'; // Rojo oscuro para velocidad muy alta
+            if (speed === 0) return '#374151'; // Gris oscuro para detenido
+            if (speed <= 40) return '#10B981'; // Verde para velocidad baja (1-40)
+            if (speed <= 79) return '#F59E0B'; // Naranja para velocidad media (41-79)
+            return '#EF4444'; // Rojo para velocidad alta (80+)
         }, []);
 
         // Crear segmentos de ruta con colores según velocidad
@@ -363,7 +362,10 @@ const LeafletMapComponent: React.FC<{
                 map.on('zoomend', handleZoomEnd);
                 map.on('movestart', handleMoveStart);
 
-                map.setView([latitude, longitude], 18);
+                // Solo establecer vista inicial si no hay interacción del usuario
+                if (!userInteractedRef.current && !isHistoryView) {
+                    map.setView([latitude, longitude], isHistoryView ? 13 : 17);
+                }
 
 
                 // Cleanup function
@@ -379,9 +381,10 @@ const LeafletMapComponent: React.FC<{
             return null;
         };
 
-        // Calcular orientación del marker durante reproducción
+        // Calcular orientación del marker usando datos reales de course o calculando bearing
         const getMarkerRotation = useCallback(() => {
-            if (!isPlaying || !historyLocations || historyLocations.length < 2 || currentLocationIndex < 1) {
+            // Si no estamos en reproducción, no hay rotación
+            if (!isPlaying || !historyLocations || historyLocations.length < 1) {
                 return 0;
             }
 
@@ -389,16 +392,40 @@ const LeafletMapComponent: React.FC<{
                 .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
             const currentLoc = sortedLocations[currentLocationIndex];
-            const prevLoc = sortedLocations[currentLocationIndex - 1];
+            if (!currentLoc) return 0;
 
-            if (!currentLoc || !prevLoc) return 0;
+            // Prioridad 1: Usar datos reales de course/heading si están disponibles
+            if (currentLoc.course !== undefined && currentLoc.course !== null && currentLoc.course >= 0) {
+                return currentLoc.course;
+            }
 
-            return calculateBearing(
-                prevLoc.latitude,
-                prevLoc.longitude,
-                currentLoc.latitude,
-                currentLoc.longitude
-            );
+            // Prioridad 2: Calcular bearing entre puntos consecutivos
+            if (currentLocationIndex > 0) {
+                const prevLoc = sortedLocations[currentLocationIndex - 1];
+                if (prevLoc) {
+                    return calculateBearing(
+                        prevLoc.latitude,
+                        prevLoc.longitude,
+                        currentLoc.latitude,
+                        currentLoc.longitude
+                    );
+                }
+            }
+
+            // Prioridad 3: Si es el primer punto, intentar calcular con el siguiente
+            if (currentLocationIndex < sortedLocations.length - 1) {
+                const nextLoc = sortedLocations[currentLocationIndex + 1];
+                if (nextLoc) {
+                    return calculateBearing(
+                        currentLoc.latitude,
+                        currentLoc.longitude,
+                        nextLoc.latitude,
+                        nextLoc.longitude
+                    );
+                }
+            }
+
+            return 0;
         }, [isPlaying, historyLocations, currentLocationIndex, calculateBearing]);
 
         // useCallback para crear marcador - SIEMPRE se ejecuta
@@ -467,8 +494,8 @@ const LeafletMapComponent: React.FC<{
 
         // useEffect para ajustar el mapa a la ruta cuando se carga el historial (SOLO UNA VEZ)
         useEffect(() => {
-            if (showRoute && routeCoordinates.length > 1 && isHistoryView && !isPlaying) {
-                // Solo ajustar al cargar inicialmente, no durante reproducción
+            if (showRoute && routeCoordinates.length > 1 && isHistoryView && !isPlaying && !userInteractedRef.current) {
+                // Solo ajustar al cargar inicialmente si el usuario no ha interactuado
                 setTimeout(() => {
                     fitMapToRoute();
                 }, 500);
@@ -524,40 +551,29 @@ const LeafletMapComponent: React.FC<{
             }
         }, [latitude, longitude, shouldFlyTo, hasValidCoordinates, isPlaying, isHistoryView, getMarkerRotation, createCustomIcon]);
 
-        // useEffect para flyTo - DESHABILITADO para vista de historial
+        // useEffect para flyTo - OPTIMIZADO para respetar interacción del usuario
         useEffect(() => {
-            if (shouldFlyTo && mapRef.current && hasValidCoordinates && !isHistoryView) {
+            if (shouldFlyTo && mapRef.current && hasValidCoordinates && !isHistoryView && !userInteractedRef.current) {
                 const newPosition: [number, number] = [latitude, longitude];
                 lastAutoMoveRef.current = Date.now();
 
-                // Reset flag de interacción del usuario
-                userInteractedRef.current = false;
-
-                // Usar flyTo para una animación más suave y controlada
-                mapRef.current.flyTo(newPosition, Math.max(17, mapRef.current.getZoom()), {
-                    duration: 1.8,
-                    easeLinearity: 0.25,
+                // Usar flyTo solo si el usuario no ha interactuado
+                const currentZoom = mapRef.current.getZoom();
+                mapRef.current.flyTo(newPosition, Math.max(currentZoom, 17), {
+                    duration: 1.2, // Animación más rápida
+                    easeLinearity: 0.15,
                     animate: true
                 });
 
-                // Actualizar posición del marcador con animación
+                // Actualizar posición del marcador sin animación excesiva
                 if (markerRef.current) {
                     markerRef.current.setLatLng(newPosition);
-
-                    // Animación de "drop" más sutil
-                    const markerElement = markerRef.current.getElement();
-                    if (markerElement) {
-                        markerElement.style.animation = 'none';
-                        setTimeout(() => {
-                            markerElement.style.animation = 'markerDrop 1.0s ease-out';
-                        }, 300);
-                    }
                 }
 
                 // Notificar que la animación se completó
                 setTimeout(() => {
                     onAnimationComplete?.();
-                }, 2000);
+                }, 1300);
             }
         }, [shouldFlyTo, latitude, longitude, onAnimationComplete, hasValidCoordinates, isHistoryView]);
 
@@ -594,10 +610,14 @@ const LeafletMapComponent: React.FC<{
         return (
             <MapContainer
                 center={[latitude, longitude]}
-                zoom={17}
+                zoom={isHistoryView ? 13 : 17}
                 style={{ height: '100%', width: '100%' }}
                 zoomControl={true}
                 attributionControl={false}
+                whenReady={() => {
+                    // El mapa se configurará en useEffect
+                }}
+                ref={mapRef}
             >
                 {/* Componente para manejar eventos del mapa */}
                 <MapEventHandler />
@@ -690,7 +710,15 @@ const LeafletMapComponent: React.FC<{
                                 return index % step === 0 || index === historyLocations.length - 1;
                             })
                             .map((location, filteredIndex) => {
+                                // Usar numeración secuencial basada en el índice filtrado
+                                const displayNumber = filteredIndex + 1;
                                 const originalIndex = historyLocations.indexOf(location);
+                                const timestamp = new Date(location.timestamp);
+                                const timeString = timestamp.toLocaleTimeString('es-ES', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                });
+                                
                                 return (
                                     <Marker
                                         key={`coordinate-point-${originalIndex}`}
@@ -708,7 +736,7 @@ const LeafletMapComponent: React.FC<{
                                                 border: 'none'
                                             }}>
                                                 <div style={{ fontWeight: 600, marginBottom: '12px', textAlign: 'center', color: '#10B981' }}>
-                                                    📍 Punto {originalIndex + 1}
+                                                    🚩 Registro {displayNumber} - {timeString}
                                                 </div>
 
                                                 <div style={{ fontSize: '14px', color: '#D1D5DB', marginBottom: '8px' }}>

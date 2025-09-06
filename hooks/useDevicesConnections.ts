@@ -18,7 +18,7 @@ export interface DevicesConnectionsData {
     devices: DeviceConnection[];
 }
 
-export function useDevicesConnections(apiUrl = 'https://suplentes7.incidentq.com/tcp/api/connections', refreshMs?: number, refreshKey?: number) {
+export function useDevicesConnections(apiUrl = 'https://gps.dxplus.org/tcp/api/connections', refreshMs?: number, refreshKey?: number) {
     const [data, setData] = useState<DevicesConnectionsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

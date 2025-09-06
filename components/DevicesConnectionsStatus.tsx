@@ -25,7 +25,7 @@ export default function DevicesConnectionsStatus(props: Props) {
 
   // Fetch inicial al montar para obtener el estado actual
   useEffect(() => {
-    fetch('https://suplentes7.incidentq.com/tcp/api/connections')
+    fetch('https://gps.dxplus.org/tcp/api/connections')
       .then(res => res.json())
       .then(data => {
         const device = data.devices?.find((d: any) => d.imei === imei);

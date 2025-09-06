@@ -163,7 +163,7 @@ export default function DeviceDetailPage() {
         if (device?.imei) {
             console.log('🚀 Dispositivo cargado - Iniciando conexión WebSocket');
             console.log('🎯 IMEI del dispositivo:', device.imei);
-            console.log('📡 URL del WebSocket:', 'wss://suplentes7.incidentq.com/gps');
+            console.log('📡 URL del WebSocket:', 'wss://dxplus.org/gps');
             console.log('🔄 Estado de conexión:', isConnected ? 'Conectado' : 'Desconectado');
         }
     }, [device?.imei, isConnected]);

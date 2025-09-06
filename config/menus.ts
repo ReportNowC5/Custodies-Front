@@ -40,5 +40,10 @@ export const menusConfig: MenuItemProps[] = [
         title: "Activos",
         icon: "lucide:map-pin",
         href: "/assets",
+    },
+    {
+        title: "Mapa",
+        icon: "heroicons:map",
+        href: "/map",
     }
 ];

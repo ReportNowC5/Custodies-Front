@@ -22,12 +22,18 @@ class Environment {
     private config: EnvironmentConfig;
 
     constructor() {
+        // Debug: Verificar variables de entorno
+        console.log('🔍 Debug Environment Variables:');
+        console.log('NEXT_PUBLIC_BACKEND_SERVICE_URL:', process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL);
+        console.log('NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
+        console.log('NEXT_PUBLIC_ENV:', process.env.NEXT_PUBLIC_ENV);
+        
         this.config = {
             api: {
-                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://suplentes7.incidentq.com/'
+                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://gps.dxplus.org/'
             },
             backend: {
-                BACKEND_SERVICE_URL: 'https://suplentes7.incidentq.com/'
+                BACKEND_SERVICE_URL: process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'https://gps.dxplus.org/'
             },
             site: {
                 SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'
@@ -39,6 +45,10 @@ class Environment {
             isProduction: process.env.NEXT_PUBLIC_ENV === 'production',
             env: process.env.NEXT_PUBLIC_ENV || 'development'
         };
+        
+        // Debug: Verificar configuración final
+        console.log('📋 Final Config:');
+        console.log('Backend URL:', this.config.backend.BACKEND_SERVICE_URL);
     }
 
     get api() {

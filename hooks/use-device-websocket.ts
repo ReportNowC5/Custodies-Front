@@ -22,7 +22,7 @@ interface UseDeviceWebSocketProps {
 }
 
 //const SOCKET_URL = 'ws://localhost:8081/gps';
-const SOCKET_URL = 'wss://suplentes7.incidentq.com/gps';
+const SOCKET_URL = 'wss://gps.dxplus.org/gps';
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketProps) => {
@@ -118,15 +118,28 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
 
             // Evento de datos GPS recibidos (patrón original)
             socket.on('gps:packet', (data) => {
+                // Procesar campo 'rumbo' y mapear a 'course' para compatibilidad
+                let processedData = data;
+                if (data && typeof data === 'object' && data.data && data.data.rumbo !== undefined) {
+                    processedData = {
+                        ...data,
+                        data: {
+                            ...data.data,
+                            course: data.data.rumbo // Mapear rumbo a course
+                        }
+                    };
+                    console.log(`🧭 Campo 'rumbo' detectado y mapeado a 'course': ${data.data.rumbo}°`);
+                }
+
                 const updates: Partial<WebSocketState> = {
-                    gpsData: data,
+                    gpsData: processedData,
                     lastUpdate: new Date()
                 };
 
                 // Procesar eventos de conexión/desconexión del dispositivo GPS
-                if (data && typeof data === 'object') {
-                    const eventType = data.type;
-                    const deviceStatus = data.status;
+                if (processedData && typeof processedData === 'object') {
+                    const eventType = processedData.type;
+                    const deviceStatus = processedData.status;
                     
                     // Eventos de conexión del dispositivo GPS
                     if (eventType === 'connection' || eventType === 'login' || eventType === 'reconnection') {
@@ -171,15 +184,29 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
             // Escuchar evento específico del dispositivo (como en tu HTML)
             socket.on(`gps:packet:${imei}`, (data) => {
                 console.log(`📬 Datos GPS específicos para ${imei}:`, data);
+                
+                // Procesar campo 'rumbo' y mapear a 'course' para compatibilidad
+                let processedData = data;
+                if (data && typeof data === 'object' && data.data && data.data.rumbo !== undefined) {
+                    processedData = {
+                        ...data,
+                        data: {
+                            ...data.data,
+                            course: data.data.rumbo // Mapear rumbo a course
+                        }
+                    };
+                    console.log(`🧭 Campo 'rumbo' detectado para ${imei} y mapeado a 'course': ${data.data.rumbo}°`);
+                }
+
                 const updates: Partial<WebSocketState> = {
-                    gpsData: data,
+                    gpsData: processedData,
                     lastUpdate: new Date()
                 };
 
                 // Procesar eventos de conexión/desconexión del dispositivo GPS específico
-                if (data && typeof data === 'object') {
-                    const eventType = data.type;
-                    const deviceStatus = data.status;
+                if (processedData && typeof processedData === 'object') {
+                    const eventType = processedData.type;
+                    const deviceStatus = processedData.status;
                     
                     // Eventos de conexión del dispositivo GPS
                     if (eventType === 'connection' || eventType === 'login' || eventType === 'reconnection') {
