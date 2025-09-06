@@ -94,7 +94,6 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
         updateState({ isConnecting: true, error: null });
 
         const socketUrl = useFallback ? FALLBACK_SOCKET_URL : PRIMARY_SOCKET_URL;
-        console.log(`🔌 Intentando conectar a: ${socketUrl}`);
 
         try {
             const socket = io(socketUrl, {
@@ -112,7 +111,6 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
 
             // Evento de conexión exitosa
             socket.on('connect', () => {
-                console.log('🔌 Conectado al WebSocket para múltiples dispositivos');
                 reconnectAttemptsRef.current = 0;
                 updateState({
                     isSocketConnected: true,
@@ -125,7 +123,6 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                     if (imei) {
                         socket.emit('join', { deviceId: imei });
                         socket.emit('join', imei);
-                        console.log(`📡 Suscrito al dispositivo: ${imei}`);
                     }
                 });
 

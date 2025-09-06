@@ -196,7 +196,6 @@ export default function MapPage() {
                                         // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
                                         const sortedHistory = recentHistory
                                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                                            .slice(0, 20);
 
                                         enrichedAsset.recentPoints = sortedHistory;
 
@@ -258,37 +257,50 @@ export default function MapPage() {
                 prevAssets.map(asset => {
                     if (asset.deviceDetails?.imei) {
                         const deviceState = getDeviceState(asset.deviceDetails.imei);
-                        const isConnectedViaWS = isDeviceConnected(asset.deviceDetails.imei);
                         
-                        // Priorizar estado del WebSocket si está disponible
-                        let connectionStatus = asset.isOnline || false;
-                        
+                        // Solo actualizar si tenemos datos específicos para este IMEI
                         if (deviceState) {
-                            // Si tenemos datos del WebSocket, usarlos
-                            connectionStatus = deviceState.isConnected;
+                            let connectionStatus = deviceState.isConnected;
                             
-                            // Si el WebSocket indica actividad reciente, considerar conectado
+                            // Verificar actividad reciente específica de este dispositivo
                             if (deviceState.lastActivity) {
                                 const timeSinceActivity = (new Date().getTime() - deviceState.lastActivity.getTime()) / (1000 * 60);
-                                if (timeSinceActivity <= 5) {
-                                    connectionStatus = true;
-                                }
+                                // Solo considerar conectado si la actividad es realmente reciente (2 minutos)
+                                connectionStatus = timeSinceActivity <= 2;
                             }
-                        } else if (asset.lastLocation) {
-                            // Fallback a la lógica basada en timestamp
-                            connectionStatus = isDeviceConnectedFallback(asset.lastLocation);
+                            
+                            // Solo actualizar si el estado realmente cambió
+                            if (asset.isOnline !== connectionStatus) {
+                                console.log(`🔄 Actualizando estado de ${asset.name} (${asset.deviceDetails.imei}): ${asset.isOnline} → ${connectionStatus}`);
+                                return {
+                                    ...asset,
+                                    isOnline: connectionStatus
+                                };
+                            }
+                        } else if (asset.lastLocation && !asset.isOnline) {
+                            // Solo aplicar fallback si no está conectado y tenemos ubicación
+                            const fallbackStatus = isDeviceConnectedFallback(asset.lastLocation);
+                            if (fallbackStatus !== asset.isOnline) {
+                                return {
+                                    ...asset,
+                                    isOnline: fallbackStatus
+                                };
+                            }
                         }
-                        
-                        return {
-                            ...asset,
-                            isOnline: connectionStatus
-                        };
                     }
                     return asset;
                 })
             );
         }
-    }, [devicesConnectionMap, assets.length, getDeviceState, isDeviceConnected]);
+    }, [devicesConnectionMap, getDeviceState, isDeviceConnected]);
+
+    // Efecto para limpiar datos del WebSocket cuando cambia el asset seleccionado
+    useEffect(() => {
+        if (selectedAsset) {
+            console.log(`🔄 Asset seleccionado cambiado a: ${selectedAsset.name} (IMEI: ${selectedAsset.deviceDetails?.imei || 'N/A'})`);
+            // Los datos del WebSocket se limpiarán automáticamente al cambiar el IMEI en useDeviceWebSocket
+        }
+    }, [selectedAsset?.id, selectedAsset?.deviceDetails?.imei]);
 
     // Efecto para actualizar la posición del asset seleccionado con datos GPS en tiempo real
     useEffect(() => {
@@ -335,7 +347,7 @@ export default function MapPage() {
                     };
                 });
                 
-                // También actualizar en la lista de assets
+                // También actualizar en la lista de assets - SOLO el asset seleccionado
                 setAssets(prevAssets => 
                     prevAssets.map(asset => {
                         if (asset.id === selectedAsset.id) {
@@ -353,17 +365,8 @@ export default function MapPage() {
                                 recentPoints: updatedPoints,
                                 isOnline: true // Marcar como conectado si recibimos datos GPS
                             };
-                        } else if (asset.deviceDetails?.imei) {
-                            // Actualizar estado de otros dispositivos basado en WebSocket múltiple
-                            const deviceState = getDeviceState(asset.deviceDetails.imei);
-                            if (deviceState && deviceState.lastActivity) {
-                                const timeSinceActivity = (new Date().getTime() - deviceState.lastActivity.getTime()) / (1000 * 60);
-                                return {
-                                    ...asset,
-                                    isOnline: timeSinceActivity <= 5
-                                };
-                            }
                         }
+                        // NO modificar otros assets aquí - mantener su estado actual
                         return asset;
                     })
                 );
@@ -465,7 +468,14 @@ export default function MapPage() {
                                                 ? 'border-2 border-[--theme-primary] bg-[--theme-primary]/5'
                                                 : 'hover:bg-muted/50'
                                             }`}
-                                        onClick={() => setSelectedAsset(asset)}
+                                        onClick={() => {
+                                            // Limpiar datos del asset anterior y seleccionar el nuevo
+                                            console.log(`🎯 Seleccionando asset: ${asset.name} (ID: ${asset.id})`);
+                                            if (asset.lastLocation) {
+                                                console.log(`📍 Coordenadas del asset seleccionado: ${asset.lastLocation.latitude}, ${asset.lastLocation.longitude}`);
+                                            }
+                                            setSelectedAsset(asset);
+                                        }}
                                     >
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex items-center gap-3">
@@ -561,19 +571,23 @@ export default function MapPage() {
                         flex: isDesktop ? 'none' : '1'
                     }}
                 >
-                    {selectedAsset?.lastLocation ? (
+                    {selectedAsset?.lastLocation && 
+                     typeof selectedAsset.lastLocation.latitude === 'number' && 
+                     typeof selectedAsset.lastLocation.longitude === 'number' && 
+                     !isNaN(selectedAsset.lastLocation.latitude) && 
+                     !isNaN(selectedAsset.lastLocation.longitude) ? (
                         <div className="relative w-full h-full">
                             <DeviceMap
                                 latitude={selectedAsset.lastLocation.latitude}
                                 longitude={selectedAsset.lastLocation.longitude}
-                                deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand} ${selectedAsset.deviceDetails?.model})`}
+                                deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand || 'N/A'} ${selectedAsset.deviceDetails?.model || 'N/A'})`}
                                 className="w-full h-full"
                                 historyLocations={selectedAsset.recentPoints || []}
                                 showRoute={true} // Siempre mostrar ruta para trazado en tiempo real
                                 routeColor="#10B981"
                                 routeWeight={4} // Línea más gruesa para mejor visibilidad
                                 fitToRoute={false}
-                                shouldFlyTo={false}
+                                shouldFlyTo={true} // Activar flyTo para centrar en el asset seleccionado
                                 isPlaying={false}
                                 currentLocationIndex={0}
                                 showProgressiveRoute={false}
@@ -648,17 +662,36 @@ export default function MapPage() {
                         </div>
                     ) : (
                         <div className="w-full h-full bg-muted/30 flex items-center justify-center">
-                            <div className="text-center">
-                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
-                                <p className="text-sm lg:text-base text-muted-foreground font-medium">
-                                    {selectedAsset ? 'Sin datos de ubicación' : 'Selecciona un activo'}
-                                </p>
-                                <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">
-                                    {selectedAsset
-                                        ? 'Este activo no tiene datos GPS disponibles'
-                                        : 'Elige un activo de la lista para ver su ubicación en tiempo real'
-                                    }
-                                </p>
+                            <div className="text-center max-w-md px-4">
+                                {selectedAsset ? (
+                                    <>
+                                        <WifiOff className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
+                                        <p className="text-sm lg:text-base text-muted-foreground font-medium">
+                                            Sin datos de ubicación
+                                        </p>
+                                        <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">
+                                            {selectedAsset.deviceDetails ? 
+                                                `El dispositivo ${selectedAsset.deviceDetails.brand} ${selectedAsset.deviceDetails.model} no tiene datos GPS recientes` :
+                                                'Este activo no tiene un dispositivo GPS asociado'
+                                            }
+                                        </p>
+                                        {selectedAsset.deviceDetails?.imei && (
+                                            <p className="text-xs text-muted-foreground/50 mt-2 font-mono">
+                                                IMEI: {selectedAsset.deviceDetails.imei}
+                                            </p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
+                                        <p className="text-sm lg:text-base text-muted-foreground font-medium">
+                                            Selecciona un activo
+                                        </p>
+                                        <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">
+                                            Elige un activo de la lista para ver su ubicación en tiempo real
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
