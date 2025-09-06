@@ -21,9 +21,12 @@ interface UseDeviceWebSocketProps {
     enabled?: boolean;
 }
 
-//const SOCKET_URL = 'ws://localhost:8081/gps';
-const SOCKET_URL = 'wss://gps.dxplus.org/gps';
-const MAX_RECONNECT_ATTEMPTS = 5;
+// URLs de WebSocket con fallback
+const PRIMARY_SOCKET_URL = 'wss://gps.dxplus.org/gps';
+const FALLBACK_SOCKET_URL = 'ws://localhost:8081/gps'; // Fallback local
+const MAX_RECONNECT_ATTEMPTS = 5; // Aumentado para mejor recuperación
+const CONNECTION_TIMEOUT = 5000; // Aumentado a 5s para conexiones más estables
+const RECONNECT_DELAY = 1000; // Aumentado a 1s para evitar spam de reconexión
 
 export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketProps) => {
     const [state, setState] = useState<WebSocketState>({
@@ -74,14 +77,17 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
         updateState({ isConnecting: true, error: null });
 
         try {
-            const socket = io(SOCKET_URL, {
+            const socket = io(PRIMARY_SOCKET_URL, {
                 query: { deviceId: imei },
                 transports: ['websocket', 'polling'],
                 auth: undefined, // token ? { token } : undefined,
-                timeout: 10000,
+                timeout: CONNECTION_TIMEOUT,
                 reconnection: true,
                 reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
-                reconnectionDelay: 1000,
+                reconnectionDelay: RECONNECT_DELAY,
+                reconnectionDelayMax: 2000, // Máximo 2s entre intentos
+                randomizationFactor: 0.2, // Añadir algo de aleatoriedad
+                forceNew: false, // Reutilizar conexiones existentes
             });
 
             socketRef.current = socket;
@@ -324,10 +330,8 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
     // Efecto para manejar conexión/desconexión
     useEffect(() => {
         if (imei && enabled) {
-            // Pequeño delay para evitar conexiones múltiples rápidas
-            timeoutRef.current = setTimeout(() => {
-                connect();
-            }, 100);
+            // Conexión inmediata para mejor responsividad
+            connect();
         } else {
             disconnect();
         }

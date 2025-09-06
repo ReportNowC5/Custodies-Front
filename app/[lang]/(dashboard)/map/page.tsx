@@ -103,8 +103,8 @@ const isDeviceConnectedFallback = (lastLocation?: { timestamp: string }) => {
     const now = new Date();
     const diffInMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
     
-    // Considerar conectado si tuvo actividad en los últimos 30 minutos
-    return diffInMinutes <= 30;
+    // Considerar conectado si tuvo actividad en los últimos 5 minutos (reducido de 30 min)
+    return diffInMinutes <= 5;
 };
 
 export default function MapPage() {
@@ -179,36 +179,44 @@ export default function MapPage() {
                                 const deviceDetails = await devicesService.getById(asset.device.id);
                                 enrichedAsset.deviceDetails = deviceDetails;
 
-                                // Obtener últimos 20 puntos del día actual
+                                // Obtener las últimas 20 posiciones sin restricción de fecha
                                 if (deviceDetails.imei) {
                                     try {
-                                        const today = new Date();
-                                        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                                        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+                                        // Usar un rango de fechas muy amplio para obtener todo el historial disponible
+                                        const veryOldDate = new Date('2020-01-01').toISOString();
+                                        const now = new Date().toISOString();
 
                                         const recentHistory = await devicesService.getHistory({
                                             deviceId: deviceDetails.imei,
-                                            from: startOfDay.toISOString(),
-                                            to: endOfDay.toISOString(),
+                                            from: veryOldDate,
+                                            to: now,
                                             limit: 20
                                         });
 
-                                        enrichedAsset.recentPoints = recentHistory.slice(0, 20);
+                                        // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
+                                        const sortedHistory = recentHistory
+                                            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                                            .slice(0, 20);
 
-                                        if (recentHistory.length > 0) {
-                                            const latest = recentHistory[0];
+                                        enrichedAsset.recentPoints = sortedHistory;
+
+                                        if (sortedHistory.length > 0) {
+                                            const latest = sortedHistory[0]; // El más reciente
                                             enrichedAsset.lastLocation = {
                                                 latitude: latest.latitude,
                                                 longitude: latest.longitude,
                                                 timestamp: latest.timestamp
                                             };
                                             
-                                            // El estado de conexión se actualizará con el WebSocket múltiple
-                                            // Por ahora usar fallback basado en timestamp
-                                            enrichedAsset.isOnline = isDeviceConnectedFallback(enrichedAsset.lastLocation);
+                                            // Usar lógica más agresiva para detección inicial
+                                            const timeSinceLastUpdate = (new Date().getTime() - new Date(latest.timestamp).getTime()) / (1000 * 60);
+                                            enrichedAsset.isOnline = timeSinceLastUpdate <= 5; // 5 minutos para consistencia
+                                            
+                                            console.log(`📍 Cargadas ${sortedHistory.length} posiciones históricas para ${asset.name} - Última: ${Math.round(timeSinceLastUpdate)}min ago`);
                                         } else {
                                             // Sin datos recientes = desconectado
                                             enrichedAsset.isOnline = false;
+                                            console.log(`⚠️ Sin datos GPS recientes para ${asset.name}`);
                                         }
                                     } catch (historyError) {
                                         console.warn(`Error loading history for device ${deviceDetails.imei}:`, historyError);
@@ -252,9 +260,28 @@ export default function MapPage() {
                         const deviceState = getDeviceState(asset.deviceDetails.imei);
                         const isConnectedViaWS = isDeviceConnected(asset.deviceDetails.imei);
                         
+                        // Priorizar estado del WebSocket si está disponible
+                        let connectionStatus = asset.isOnline || false;
+                        
+                        if (deviceState) {
+                            // Si tenemos datos del WebSocket, usarlos
+                            connectionStatus = deviceState.isConnected;
+                            
+                            // Si el WebSocket indica actividad reciente, considerar conectado
+                            if (deviceState.lastActivity) {
+                                const timeSinceActivity = (new Date().getTime() - deviceState.lastActivity.getTime()) / (1000 * 60);
+                                if (timeSinceActivity <= 5) {
+                                    connectionStatus = true;
+                                }
+                            }
+                        } else if (asset.lastLocation) {
+                            // Fallback a la lógica basada en timestamp
+                            connectionStatus = isDeviceConnectedFallback(asset.lastLocation);
+                        }
+                        
                         return {
                             ...asset,
-                            isOnline: deviceState ? deviceState.isConnected : (asset.isOnline || false)
+                            isOnline: connectionStatus
                         };
                     }
                     return asset;
@@ -262,6 +289,89 @@ export default function MapPage() {
             );
         }
     }, [devicesConnectionMap, assets.length, getDeviceState, isDeviceConnected]);
+
+    // Efecto para actualizar la posición del asset seleccionado con datos GPS en tiempo real
+    useEffect(() => {
+        if (selectedAsset && gpsData && gpsData.data) {
+            const { latitude: lat, longitude: lng, lat: altLat, lng: altLng, speed, course } = gpsData.data;
+            
+            // Extraer coordenadas (soportar diferentes formatos)
+            const newLatitude = lat || altLat;
+            const newLongitude = lng || altLng;
+            
+            if (newLatitude && newLongitude && 
+                typeof newLatitude === 'number' && typeof newLongitude === 'number') {
+                
+                const newTimestamp = new Date().toISOString();
+                
+                // Crear nuevo punto GPS compatible con DeviceHistoryLocation
+                const newGpsPoint: DeviceHistoryLocation = {
+                    id: Date.now(), // ID único numérico para tiempo real
+                    deviceId: selectedAsset.deviceDetails?.imei || 'unknown',
+                    latitude: newLatitude,
+                    longitude: newLongitude,
+                    timestamp: newTimestamp,
+                    speed: speed || 0,
+                    course: course || 0,
+                    createdAt: newTimestamp
+                };
+                
+                // Actualizar la posición del asset seleccionado inmediatamente
+                setSelectedAsset(prevAsset => {
+                    if (!prevAsset) return prevAsset;
+                    
+                    // Mantener las últimas 20 posiciones para el trazado en tiempo real
+                    const currentPoints = prevAsset.recentPoints || [];
+                    const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
+                    
+                    return {
+                        ...prevAsset,
+                        lastLocation: {
+                            latitude: newLatitude,
+                            longitude: newLongitude,
+                            timestamp: newTimestamp
+                        },
+                        recentPoints: updatedPoints
+                    };
+                });
+                
+                // También actualizar en la lista de assets
+                setAssets(prevAssets => 
+                    prevAssets.map(asset => {
+                        if (asset.id === selectedAsset.id) {
+                            // Mantener las últimas 20 posiciones para el trazado
+                            const currentPoints = asset.recentPoints || [];
+                            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
+                            
+                            return {
+                                ...asset,
+                                lastLocation: {
+                                    latitude: newLatitude,
+                                    longitude: newLongitude,
+                                    timestamp: newTimestamp
+                                },
+                                recentPoints: updatedPoints,
+                                isOnline: true // Marcar como conectado si recibimos datos GPS
+                            };
+                        } else if (asset.deviceDetails?.imei) {
+                            // Actualizar estado de otros dispositivos basado en WebSocket múltiple
+                            const deviceState = getDeviceState(asset.deviceDetails.imei);
+                            if (deviceState && deviceState.lastActivity) {
+                                const timeSinceActivity = (new Date().getTime() - deviceState.lastActivity.getTime()) / (1000 * 60);
+                                return {
+                                    ...asset,
+                                    isOnline: timeSinceActivity <= 5
+                                };
+                            }
+                        }
+                        return asset;
+                    })
+                );
+                
+                console.log(`🗺️ Posición actualizada en tiempo real: ${newLatitude}, ${newLongitude} | Puntos en trazado: ${(selectedAsset.recentPoints?.length || 0) + 1}`);
+            }
+        }
+    }, [gpsData, selectedAsset?.id]);
 
     // El WebSocket se mantiene solo para el asset seleccionado para datos en tiempo real
     // El estado de conexión de la lista se basa en la última actividad de cada dispositivo
@@ -459,9 +569,9 @@ export default function MapPage() {
                                 deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand} ${selectedAsset.deviceDetails?.model})`}
                                 className="w-full h-full"
                                 historyLocations={selectedAsset.recentPoints || []}
-                                showRoute={selectedAsset.recentPoints && selectedAsset.recentPoints.length > 1}
+                                showRoute={true} // Siempre mostrar ruta para trazado en tiempo real
                                 routeColor="#10B981"
-                                routeWeight={3}
+                                routeWeight={4} // Línea más gruesa para mejor visibilidad
                                 fitToRoute={false}
                                 shouldFlyTo={false}
                                 isPlaying={false}
@@ -475,6 +585,7 @@ export default function MapPage() {
                         }
                                 lastLocationUpdate={selectedAsset.lastLocation.timestamp}
                                 theme={mode}
+                                currentBearing={gpsData?.data?.course || gpsData?.data?.rumbo}
                             />
 
                             {/* Speed Legend */}
@@ -523,6 +634,12 @@ export default function MapPage() {
                                     <div className="text-xs text-muted-foreground">
                                         {selectedAsset.lastLocation.latitude.toFixed(6)}, {selectedAsset.lastLocation.longitude.toFixed(6)}
                                     </div>
+                                    {(gpsData?.data?.course || gpsData?.data?.rumbo) && (
+                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                            <span>🧭</span>
+                                            <span>Orientación: {(gpsData.data.course || gpsData.data.rumbo).toFixed(1)}°</span>
+                                        </div>
+                                    )}
                                     <div className="text-xs text-muted-foreground mt-1">
                                         Última actualización: {formatDate(selectedAsset.lastLocation.timestamp)}
                                     </div>

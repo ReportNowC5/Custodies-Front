@@ -24,8 +24,12 @@ interface UseMultipleDevicesWebSocketProps {
     enabled?: boolean;
 }
 
-const SOCKET_URL = 'wss://gps.dxplus.org/gps';
-const MAX_RECONNECT_ATTEMPTS = 5;
+// URLs de WebSocket con fallback
+const PRIMARY_SOCKET_URL = 'wss://gps.dxplus.org/gps';
+const FALLBACK_SOCKET_URL = 'ws://localhost:8081/gps'; // Fallback local
+const MAX_RECONNECT_ATTEMPTS = 5; // Aumentado para mejor recuperación
+const CONNECTION_TIMEOUT = 5000; // Aumentado a 5s para conexiones más estables
+const RECONNECT_DELAY = 1000; // Aumentado a 1s para evitar spam de reconexión
 
 export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultipleDevicesWebSocketProps) => {
     const [state, setState] = useState<MultipleDevicesWebSocketState>({
@@ -82,20 +86,26 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
         return Array.from(state.devices.values());
     }, [state.devices]);
 
-    const connect = useCallback(() => {
+    const connect = useCallback((useFallback = false) => {
         if (!enabled || imeis.length === 0 || socketRef.current?.connected) {
             return;
         }
 
         updateState({ isConnecting: true, error: null });
 
+        const socketUrl = useFallback ? FALLBACK_SOCKET_URL : PRIMARY_SOCKET_URL;
+        console.log(`🔌 Intentando conectar a: ${socketUrl}`);
+
         try {
-            const socket = io(SOCKET_URL, {
+            const socket = io(socketUrl, {
                 transports: ['websocket', 'polling'],
-                timeout: 10000,
+                timeout: CONNECTION_TIMEOUT,
                 reconnection: true,
                 reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
-                reconnectionDelay: 1000,
+                reconnectionDelay: RECONNECT_DELAY,
+                reconnectionDelayMax: 5000, // Máximo 5s entre intentos
+                randomizationFactor: 0.3, // Más aleatoriedad para evitar colisiones
+                forceNew: false, // Reutilizar conexiones existentes
             });
 
             socketRef.current = socket;
@@ -259,21 +269,33 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                 });
             });
 
-            // Evento de error de conexión
+            // Evento de error de conexión con fallback
             socket.on('connect_error', (err) => {
                 console.error('🚫 Error de conexión WebSocket:', err.message);
+                
+                // Si estamos usando la URL principal y falla, intentar con fallback
+                if (!useFallback && reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS - 2) {
+                    console.log('🔄 Intentando con URL de fallback...');
+                    socket.disconnect();
+                    setTimeout(() => connect(true), 2000);
+                    return;
+                }
+                
                 updateState({
                     isSocketConnected: false,
                     isConnecting: false,
-                    error: `Error de conexión: ${err.message}`
+                    error: `Error de conexión: ${err.message}${useFallback ? ' (fallback)' : ''}`
                 });
             });
 
             // Manejo de intentos de reconexión
             socket.io.on('reconnect_attempt', (attemptNumber) => {
                 reconnectAttemptsRef.current = attemptNumber;
-                console.log(`🔁 Intentando reconectar... intento #${attemptNumber}`);
-                updateState({ isConnecting: true });
+                console.log(`🔁 Intentando reconectar... intento #${attemptNumber}/${MAX_RECONNECT_ATTEMPTS}`);
+                updateState({
+                    isConnecting: true,
+                    error: `Reconectando... intento ${attemptNumber}/${MAX_RECONNECT_ATTEMPTS}`
+                });
 
                 if (attemptNumber > MAX_RECONNECT_ATTEMPTS) {
                     console.error('❌ Demasiados intentos de reconexión. Abortando.');

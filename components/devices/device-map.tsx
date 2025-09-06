@@ -4,6 +4,15 @@ import dynamic from 'next/dynamic';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Importar utilidades de animación suave
+import { 
+    MarkerAnimator, 
+    GPSThrottler, 
+    PositionPredictor,
+    GeoCoordinates,
+    easeInOutCubic 
+} from '@/lib/utils/map-animations';
+
 // Configurar iconos por defecto de Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -43,6 +52,7 @@ const LeafletMapComponent: React.FC<{
     lastLocationUpdate?: string | null;
     theme?: string;
     isHistoryView?: boolean;
+    currentBearing?: number;
 }> = ({
     latitude,
     longitude,
@@ -61,7 +71,8 @@ const LeafletMapComponent: React.FC<{
     isConnected = false,
     lastLocationUpdate = null,
     theme = 'dark',
-    isHistoryView = false
+    isHistoryView = false,
+    currentBearing
 }) => {
         // Todos los hooks deben estar en el top level - SIEMPRE
         const mapRef = useRef<L.Map | null>(null);
@@ -69,21 +80,86 @@ const LeafletMapComponent: React.FC<{
         const userInteractedRef = useRef<boolean>(false);
         const lastAutoMoveRef = useRef<number>(0);
         const [isClient, setIsClient] = useState(false);
+        
+        // Referencias para animación suave
+        const animatorRef = useRef<MarkerAnimator>(new MarkerAnimator());
+        const throttlerRef = useRef<GPSThrottler>(new GPSThrottler(isHistoryView ? 500 : 200)); // Más frecuente para tiempo real
+        const predictorRef = useRef<PositionPredictor>(new PositionPredictor());
+        const lastPositionRef = useRef<GeoCoordinates | null>(null);
+        const isAnimatingRef = useRef<boolean>(false);
+        const lastUpdateTimeRef = useRef<number>(0);
+        const predictionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
         // useEffect para inicializar cliente - SIEMPRE se ejecuta
         useEffect(() => {
             setIsClient(true);
         }, []);
 
-        // Procesar ubicaciones del historial para crear la ruta
+        // Función para predicción inteligente durante pérdidas de señal
+        const startPredictiveUpdates = useCallback(() => {
+            if (predictionTimeoutRef.current || isHistoryView || !lastPositionRef.current) return;
+
+            const updatePrediction = () => {
+                const predictedPosition = predictorRef.current.predictNext(1000); // Predecir 1 segundo adelante
+                
+                if (predictedPosition && !isAnimatingRef.current && markerRef.current) {
+                    const timeSinceLastUpdate = Date.now() - lastUpdateTimeRef.current;
+                    
+                    // Solo usar predicción si han pasado más de 2 segundos sin datos reales
+                    if (timeSinceLastUpdate > 2000) {
+                        console.log('🔮 Usando predicción de posición durante pérdida de señal');
+                        
+                        // Actualizar posición con predicción (animación más sutil)
+                        const currentPos = markerRef.current.getLatLng();
+                        const distance = Math.sqrt(
+                            Math.pow(predictedPosition.lat - currentPos.lat, 2) + 
+                            Math.pow(predictedPosition.lng - currentPos.lng, 2)
+                        );
+                        
+                        // Solo aplicar predicción si el movimiento es razonable (< 0.001 grados ≈ 100m)
+                        if (distance < 0.001) {
+                            markerRef.current.setLatLng([predictedPosition.lat, predictedPosition.lng]);
+                        }
+                    }
+                }
+                
+                // Continuar predicción cada segundo
+                predictionTimeoutRef.current = setTimeout(updatePrediction, 1000);
+            };
+            
+            predictionTimeoutRef.current = setTimeout(updatePrediction, 1000);
+        }, [isHistoryView]);
+
+        // Función para detener predicción
+        const stopPredictiveUpdates = useCallback(() => {
+            if (predictionTimeoutRef.current) {
+                clearTimeout(predictionTimeoutRef.current);
+                predictionTimeoutRef.current = null;
+            }
+        }, []);
+
+        // useEffect para limpieza de animaciones al desmontar
+        useEffect(() => {
+            return () => {
+                // Cancelar animaciones pendientes al desmontar el componente
+                animatorRef.current.cancelAnimation();
+                predictorRef.current.clear();
+                stopPredictiveUpdates();
+            };
+        }, [stopPredictiveUpdates]);
+
+        // Procesar ubicaciones del historial para crear la ruta (optimizado)
         const processRouteCoordinates = useCallback(() => {
             if (!historyLocations || historyLocations.length === 0) return [];
 
-            // Ordenar por timestamp y convertir a coordenadas de Leaflet
-            return historyLocations
-                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                .map(location => [location.latitude, location.longitude] as [number, number]);
-        }, [historyLocations]);
+            // Para tiempo real, mantener orden descendente (más reciente primero)
+            // Para historial, ordenar por timestamp ascendente
+            const sortedLocations = isHistoryView 
+                ? historyLocations.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                : historyLocations; // Ya viene ordenado descendente para tiempo real
+
+            return sortedLocations.map(location => [location.latitude, location.longitude] as [number, number]);
+        }, [historyLocations, isHistoryView]);
 
         // Obtener coordenadas de la ruta
         const routeCoordinates = processRouteCoordinates();
@@ -281,47 +357,72 @@ const LeafletMapComponent: React.FC<{
 
         // Crear icono personalizado con orientación
         const createCustomIcon = (rotation = 0) => {
+            const iconColor = isConnected ? '#10B981' : '#EF4444'; // Verde si conectado, rojo si no
+            const pulseColor = isConnected ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+            
             return L.divIcon({
                 html: `
         <div style="
-          width: 40px;
-          height: 40px;
+          width: 50px;
+          height: 50px;
           transform: rotate(${rotation}deg);
-          transition: transform 0.3s ease;
+          transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
         ">
+          <!-- Marcador principal con forma de flecha -->
           <div style="
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            background: linear-gradient(135deg, ${iconColor} 0%, ${iconColor}dd 100%);
             border: 3px solid #ffffff;
-            border-radius: 50% 50% 50% 0;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4), 0 0 0 4px rgba(16, 185, 129, 0.1);
+            clip-path: polygon(50% 0%, 0% 100%, 50% 85%, 100% 100%);
+            box-shadow: 0 4px 12px ${pulseColor}, 0 0 0 4px ${pulseColor.replace('0.4', '0.1')};
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
             animation: devicePulse 2s infinite;
           ">
+            <!-- Punto central -->
             <div style="
-              width: 12px;
-              height: 12px;
+              width: 8px;
+              height: 8px;
               background: #ffffff;
               border-radius: 50%;
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
               box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             "></div>
           </div>
+          
+          <!-- Indicador de dirección adicional -->
+          <div style="
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 12px solid ${iconColor};
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+          "></div>
+          
           <style>
             @keyframes devicePulse {
-              0%, 100% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4), 0 0 0 4px rgba(16, 185, 129, 0.1); }
-              50% { box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6), 0 0 0 8px rgba(16, 185, 129, 0.2); }
+              0%, 100% { box-shadow: 0 4px 12px ${pulseColor}, 0 0 0 4px ${pulseColor.replace('0.4', '0.1')}; }
+              50% { box-shadow: 0 6px 16px ${pulseColor.replace('0.4', '0.6')}, 0 0 0 8px ${pulseColor.replace('0.4', '0.2')}; }
             }
           </style>
         </div>
       `,
                 className: 'custom-device-marker',
-                iconSize: [40, 40],
-                iconAnchor: [20, 20],
-                popupAnchor: [0, -20]
+                iconSize: [50, 50],
+                iconAnchor: [25, 25],
+                popupAnchor: [0, -25]
             });
         };
 
@@ -334,12 +435,16 @@ const LeafletMapComponent: React.FC<{
 
                 mapRef.current = map;
 
-                // Detectar interacción manual del usuario
+                // Detectar interacción manual del usuario (optimizado)
                 const handleUserInteraction = (eventType: string) => {
                     const now = Date.now();
                     // Solo marcar como interacción manual si no fue un movimiento automático reciente
-                    if (now - lastAutoMoveRef.current > 1500) { // Aumentar el tiempo de gracia
+                    // Tiempo de gracia más corto para tiempo real, más largo para historial
+                    const graceTime = isHistoryView ? 2000 : 1000;
+                    
+                    if (now - lastAutoMoveRef.current > graceTime) {
                         userInteractedRef.current = true;
+                        console.log(`👆 Interacción manual detectada: ${eventType}`);
                     }
                 };
 
@@ -363,8 +468,9 @@ const LeafletMapComponent: React.FC<{
                 map.on('movestart', handleMoveStart);
 
                 // Solo establecer vista inicial si no hay interacción del usuario
-                if (!userInteractedRef.current && !isHistoryView) {
-                    map.setView([latitude, longitude], isHistoryView ? 13 : 17);
+                if (!userInteractedRef.current) {
+                    const initialZoom = isHistoryView ? 13 : (hasValidCoordinates ? 17 : 15);
+                    map.setView([latitude, longitude], initialZoom);
                 }
 
 
@@ -383,8 +489,17 @@ const LeafletMapComponent: React.FC<{
 
         // Calcular orientación del marker usando datos reales de course o calculando bearing
         const getMarkerRotation = useCallback(() => {
-            // Si no estamos en reproducción, no hay rotación
+            // Prioridad 1: Usar orientación en tiempo real si está disponible (para vista en tiempo real)
+            if (!isHistoryView && currentBearing !== undefined && currentBearing !== null && currentBearing >= 0) {
+                return currentBearing;
+            }
+
+            // Para vista de historial o cuando no hay orientación en tiempo real
             if (!isPlaying || !historyLocations || historyLocations.length < 1) {
+                // Si no estamos en reproducción pero tenemos orientación en tiempo real, usarla
+                if (!isHistoryView && currentBearing !== undefined && currentBearing !== null && currentBearing >= 0) {
+                    return currentBearing;
+                }
                 return 0;
             }
 
@@ -394,12 +509,12 @@ const LeafletMapComponent: React.FC<{
             const currentLoc = sortedLocations[currentLocationIndex];
             if (!currentLoc) return 0;
 
-            // Prioridad 1: Usar datos reales de course/heading si están disponibles
+            // Prioridad 2: Usar datos reales de course/heading si están disponibles
             if (currentLoc.course !== undefined && currentLoc.course !== null && currentLoc.course >= 0) {
                 return currentLoc.course;
             }
 
-            // Prioridad 2: Calcular bearing entre puntos consecutivos
+            // Prioridad 3: Calcular bearing entre puntos consecutivos
             if (currentLocationIndex > 0) {
                 const prevLoc = sortedLocations[currentLocationIndex - 1];
                 if (prevLoc) {
@@ -412,7 +527,7 @@ const LeafletMapComponent: React.FC<{
                 }
             }
 
-            // Prioridad 3: Si es el primer punto, intentar calcular con el siguiente
+            // Prioridad 4: Si es el primer punto, intentar calcular con el siguiente
             if (currentLocationIndex < sortedLocations.length - 1) {
                 const nextLoc = sortedLocations[currentLocationIndex + 1];
                 if (nextLoc) {
@@ -426,7 +541,7 @@ const LeafletMapComponent: React.FC<{
             }
 
             return 0;
-        }, [isPlaying, historyLocations, currentLocationIndex, calculateBearing]);
+        }, [isPlaying, historyLocations, currentLocationIndex, calculateBearing, currentBearing, isHistoryView]);
 
         // useCallback para crear marcador - SIEMPRE se ejecuta
         const createMarker = useCallback(() => {
@@ -437,7 +552,29 @@ const LeafletMapComponent: React.FC<{
                 icon: createCustomIcon(rotation)
             }).addTo(mapRef.current);
 
-            // Crear popup personalizado
+            // Crear popup personalizado con estado de conexión dinámico
+            const connectionStatus = isConnected ? 'En línea' : 'Desconectado';
+            const connectionColor = isConnected ? '#10B981' : '#EF4444';
+            
+            // Importar función para convertir bearing a dirección
+            const bearingToDirection = (bearing: number): string => {
+                const normalizedBearing = ((bearing % 360) + 360) % 360;
+                
+                if (normalizedBearing >= 337.5 || normalizedBearing < 22.5) return 'Norte';
+                if (normalizedBearing >= 22.5 && normalizedBearing < 67.5) return 'Noreste';
+                if (normalizedBearing >= 67.5 && normalizedBearing < 112.5) return 'Este';
+                if (normalizedBearing >= 112.5 && normalizedBearing < 157.5) return 'Sureste';
+                if (normalizedBearing >= 157.5 && normalizedBearing < 202.5) return 'Sur';
+                if (normalizedBearing >= 202.5 && normalizedBearing < 247.5) return 'Suroeste';
+                if (normalizedBearing >= 247.5 && normalizedBearing < 292.5) return 'Oeste';
+                if (normalizedBearing >= 292.5 && normalizedBearing < 337.5) return 'Noroeste';
+                
+                return 'Desconocido';
+            };
+            
+            const currentRotation = getMarkerRotation();
+            const directionText = currentRotation > 0 ? bearingToDirection(currentRotation) : 'Sin datos';
+            
             const popupContent = `
       <div style="
         background: rgba(17, 24, 39, 0.95);
@@ -445,7 +582,7 @@ const LeafletMapComponent: React.FC<{
         padding: 16px;
         border-radius: 8px;
         font-family: system-ui, -apple-system, sans-serif;
-        min-width: 200px;
+        min-width: 220px;
         border: none;
       ">
         <div style="font-weight: 600; margin-bottom: 8px; text-align: center;">${deviceName}</div>
@@ -454,14 +591,22 @@ const LeafletMapComponent: React.FC<{
             <span style="font-weight: 500;">Latitud:</span>
             <span style="font-family: monospace;">${latitude.toFixed(6)}</span>
           </div>
-          <div style="display: flex; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span style="font-weight: 500;">Longitud:</span>
             <span style="font-family: monospace;">${longitude.toFixed(6)}</span>
           </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span style="font-weight: 500;">Orientación:</span>
+            <span style="font-family: monospace;">${currentRotation > 0 ? `${currentRotation.toFixed(1)}° (${directionText})` : 'Sin datos'}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-weight: 500;">Última actualización:</span>
+            <span style="font-size: 12px;">${new Date().toLocaleTimeString('es-ES')}</span>
+          </div>
         </div>
         <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-          <div style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; animation: pulse 2s infinite;"></div>
-          <span style="font-size: 12px; color: #10B981; font-weight: 500;">En línea</span>
+          <div style="width: 8px; height: 8px; background: ${connectionColor}; border-radius: 50%; animation: pulse 2s infinite;"></div>
+          <span style="font-size: 12px; color: ${connectionColor}; font-weight: 500;">${connectionStatus}</span>
         </div>
       </div>
       <style>
@@ -483,7 +628,7 @@ const LeafletMapComponent: React.FC<{
             markerRef.current = marker;
 
             return marker;
-        }, [latitude, longitude, deviceName, getMarkerRotation]);
+        }, [latitude, longitude, deviceName, getMarkerRotation, isConnected, createCustomIcon]);
 
         // useEffect para inicializar marcador - SIEMPRE se ejecuta
         useEffect(() => {
@@ -491,6 +636,18 @@ const LeafletMapComponent: React.FC<{
                 createMarker();
             }
         }, [createMarker]);
+
+        // useEffect para recrear marcador cuando cambie el estado de conexión
+        useEffect(() => {
+            if (mapRef.current && markerRef.current) {
+                // Remover marcador anterior
+                mapRef.current.removeLayer(markerRef.current);
+                markerRef.current = null;
+                
+                // Crear nuevo marcador con estado actualizado
+                createMarker();
+            }
+        }, [isConnected, createMarker]);
 
         // useEffect para ajustar el mapa a la ruta cuando se carga el historial (SOLO UNA VEZ)
         useEffect(() => {
@@ -501,55 +658,181 @@ const LeafletMapComponent: React.FC<{
                 }, 500);
             }
         }, [showRoute, routeCoordinates.length, fitMapToRoute, isHistoryView]); // Removido isPlaying de dependencias
-        // useEffect para actualizar posición y orientación - SIEMPRE se ejecuta
+        // Función para interpolar orientación suavemente
+        const interpolateBearing = useCallback((startBearing: number, endBearing: number, progress: number): number => {
+            // Normalizar ángulos a 0-360
+            const normalizeAngle = (angle: number) => ((angle % 360) + 360) % 360;
+            
+            const start = normalizeAngle(startBearing);
+            const end = normalizeAngle(endBearing);
+            
+            // Calcular la diferencia más corta entre ángulos
+            let diff = end - start;
+            if (Math.abs(diff) > 180) {
+                diff = diff > 0 ? diff - 360 : diff + 360;
+            }
+            
+            return normalizeAngle(start + diff * progress);
+        }, []);
+
+        // Función para actualizar posición con interpolación suave
+        const updateMarkerPositionSmooth = useCallback(async (newLat: number, newLng: number) => {
+            if (!mapRef.current || !markerRef.current || isAnimatingRef.current) return;
+
+            const newPosition: GeoCoordinates = { lat: newLat, lng: newLng };
+            const currentPosition = markerRef.current.getLatLng();
+            const startPosition: GeoCoordinates = { 
+                lat: currentPosition.lat, 
+                lng: currentPosition.lng 
+            };
+
+            // Verificar si la posición cambió significativamente
+            if (Math.abs(startPosition.lat - newPosition.lat) < 0.00001 &&
+                Math.abs(startPosition.lng - newPosition.lng) < 0.00001) {
+                return;
+            }
+
+            // Añadir posición al predictor para futuras predicciones
+            predictorRef.current.addPosition({
+                ...newPosition,
+                timestamp: Date.now()
+            });
+
+            // Calcular orientación inicial y final para interpolación suave
+            const startBearing = getMarkerRotation();
+            let endBearing = startBearing;
+            
+            // Calcular nueva orientación basada en el movimiento
+            if (lastPositionRef.current) {
+                const { calculateBearing } = await import('@/lib/utils/geo-utils');
+                
+                // Convertir GeoCoordinates a GeoPoint para calculateBearing
+                const startPoint = {
+                    latitude: lastPositionRef.current.lat,
+                    longitude: lastPositionRef.current.lng
+                };
+                const endPoint = {
+                    latitude: newPosition.lat,
+                    longitude: newPosition.lng
+                };
+                
+                endBearing = calculateBearing(startPoint, endPoint);
+            }
+            
+            // Si tenemos datos de rumbo GPS, usar esos en su lugar
+            const gpsRotation = getMarkerRotation();
+            if (gpsRotation > 0) {
+                endBearing = gpsRotation;
+            }
+
+            // Configurar duración de animación según el contexto
+            const duration = isPlaying && isHistoryView ? 800 : 600;
+            const easing = isHistoryView ? easeInOutCubic : easeInOutCubic;
+
+            isAnimatingRef.current = true;
+
+            try {
+                // Animar movimiento suave del marcador con rotación interpolada
+                await animatorRef.current.smoothMove(startPosition, newPosition, {
+                    duration,
+                    easing,
+                    onUpdate: (position, progress) => {
+                        if (markerRef.current) {
+                            // Actualizar posición del marcador durante la animación
+                            markerRef.current.setLatLng([position.lat, position.lng]);
+                            
+                            // Interpolar orientación suavemente
+                            const currentBearing = interpolateBearing(startBearing, endBearing, progress);
+                            const newIcon = createCustomIcon(currentBearing);
+                            markerRef.current.setIcon(newIcon);
+                        }
+                    },
+                    onComplete: () => {
+                        isAnimatingRef.current = false;
+                        
+                        // Actualizar orientación final
+                        if (markerRef.current) {
+                            const finalRotation = getMarkerRotation() || endBearing;
+                            const newIcon = createCustomIcon(finalRotation);
+                            markerRef.current.setIcon(newIcon);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.warn('Error en animación del marcador:', error);
+                isAnimatingRef.current = false;
+                
+                // Fallback: actualización directa
+                if (markerRef.current) {
+                    markerRef.current.setLatLng([newPosition.lat, newPosition.lng]);
+                    const rotation = getMarkerRotation() || endBearing;
+                    const newIcon = createCustomIcon(rotation);
+                    markerRef.current.setIcon(newIcon);
+                }
+            }
+
+            // Actualizar referencia de última posición
+            lastPositionRef.current = newPosition;
+
+        }, [isPlaying, isHistoryView, getMarkerRotation, createCustomIcon, interpolateBearing]);
+
+        // useEffect para actualizar posición y orientación con throttling optimizado - SIEMPRE se ejecuta
         useEffect(() => {
-            if (mapRef.current && markerRef.current) {
-                const newPosition: [number, number] = [latitude, longitude];
-
-                // Solo actualizar si las coordenadas son diferentes
-                const currentPosition = markerRef.current.getLatLng();
-                if (!currentPosition ||
-                    Math.abs(currentPosition.lat - latitude) > 0.0001 ||
-                    Math.abs(currentPosition.lng - longitude) > 0.0001) {
-
-                    // Actualizar posición del marcador con animación suave
-                    if (isPlaying && isHistoryView) {
-                        // Durante reproducción, usar animación más suave
+            if (mapRef.current && markerRef.current && hasValidCoordinates) {
+                // Actualizar timestamp de última actualización real
+                lastUpdateTimeRef.current = Date.now();
+                
+                // Detener predicción cuando llegan datos reales
+                stopPredictiveUpdates();
+                
+                // Aplicar throttling inteligente
+                const shouldUpdate = isHistoryView ? throttlerRef.current.shouldUpdate() : true; // Siempre actualizar en tiempo real
+                
+                if (shouldUpdate) {
+                    // Usar interpolación suave para tiempo real
+                    if (!isHistoryView) {
+                        updateMarkerPositionSmooth(latitude, longitude);
+                        
+                        // Iniciar predicción para futuras pérdidas de señal
+                        setTimeout(() => {
+                            startPredictiveUpdates();
+                        }, 1000);
+                    } else {
+                        // Para vista de historial, usar animación CSS más simple
+                        const newPosition: [number, number] = [latitude, longitude];
                         const markerElement = markerRef.current.getElement();
+                        
                         if (markerElement) {
                             markerElement.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
                         }
                         
                         markerRef.current.setLatLng(newPosition);
                         
-                        // Actualizar orientación del marker durante reproducción
+                        // Actualizar orientación
                         const rotation = getMarkerRotation();
                         const newIcon = createCustomIcon(rotation);
                         markerRef.current.setIcon(newIcon);
-                    } else {
-                        // Para vista normal, actualización directa
-                        markerRef.current.setLatLng(newPosition);
                     }
 
                     // Centrado automático suave SOLO para vista en tiempo real (no historial)
-                    if (hasValidCoordinates && !shouldFlyTo && !isHistoryView) {
+                    if (!shouldFlyTo && !isHistoryView && !userInteractedRef.current && !isAnimatingRef.current) {
                         lastAutoMoveRef.current = Date.now();
 
                         // Usar panTo para movimiento suave sin cambiar zoom
-                        mapRef.current.panTo(newPosition, {
+                        mapRef.current.panTo([latitude, longitude], {
                             animate: true,
-                            duration: 1.2,
-                            easeLinearity: 0.3
+                            duration: 0.5,
+                            easeLinearity: 0.25
                         });
 
-                        // Reset flag de interacción después de un tiempo
+                        // Reset flag de interacción después de un tiempo más corto
                         setTimeout(() => {
                             userInteractedRef.current = false;
-                        }, 2000);
+                        }, 1500);
                     }
                 }
             }
-        }, [latitude, longitude, shouldFlyTo, hasValidCoordinates, isPlaying, isHistoryView, getMarkerRotation, createCustomIcon]);
+        }, [latitude, longitude, shouldFlyTo, hasValidCoordinates, isPlaying, isHistoryView, updateMarkerPositionSmooth, stopPredictiveUpdates, startPredictiveUpdates]);
 
         // useEffect para flyTo - OPTIMIZADO para respetar interacción del usuario
         useEffect(() => {
@@ -666,15 +949,15 @@ const LeafletMapComponent: React.FC<{
                 {/* Línea principal de tracking - conecta TODAS las coordenadas */}
                 {showRoute && routeCoordinates.length > 1 && (
                     <Polyline
-                        key={`main-tracking-line-${isPlaying ? currentLocationIndex : 'static'}`}
+                        key={`main-tracking-line-${isHistoryView ? 'history' : 'realtime'}-${routeCoordinates.length}`}
                         positions={showProgressiveRoute && isPlaying
                             ? routeCoordinates.slice(0, currentLocationIndex + 1)
                             : routeCoordinates
                         }
                         pathOptions={{
-                            color: '#3B82F6',
-                            weight: 4,
-                            opacity: 0.9,
+                            color: isHistoryView ? '#3B82F6' : '#10B981', // Verde para tiempo real, azul para historial
+                            weight: isHistoryView ? 4 : 5, // Más grueso para tiempo real
+                            opacity: isHistoryView ? 0.9 : 1,
                             dashArray: '0',
                             lineCap: 'round',
                             lineJoin: 'round'
@@ -971,6 +1254,7 @@ interface DeviceMapProps {
     lastLocationUpdate?: string | null;
     theme?: string;
     isHistoryView?: boolean; // Nueva prop para indicar si es vista de historial
+    currentBearing?: number; // Nueva prop para orientación en tiempo real (rumbo GPS)
 }
 
 export const DeviceMap: React.FC<DeviceMapProps> = ({
@@ -993,7 +1277,8 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
     isConnected = false,
     lastLocationUpdate = null,
     theme = 'dark',
-    isHistoryView = false
+    isHistoryView = false,
+    currentBearing
 }) => {
     const [isClient, setIsClient] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -1083,6 +1368,7 @@ export const DeviceMap: React.FC<DeviceMapProps> = ({
                 lastLocationUpdate={lastLocationUpdate}
                 theme={theme}
                 isHistoryView={isHistoryView}
+                currentBearing={currentBearing}
             />
         </div>
     );
