@@ -677,17 +677,17 @@ export default function MapPage() {
                     }}
                 >
                     {selectedAsset && (
-                            // Caso 1: Tiene ubicación válida en lastLocation
-                            (selectedAsset.lastLocation && selectedAsset.lastLocation.latitude && selectedAsset.lastLocation.longitude) ||
-                            // Caso 2: No hay historial pero sí datos GPS del WebSocket
-                            (!selectedAsset.lastLocation?.latitude && gpsData?.data?.latitude && gpsData?.data?.longitude && 
-                             selectedAsset?.deviceDetails?.imei === gpsData?.deviceId)
+                            // Caso 1: Datos GPS del WebSocket en tiempo real (PRIORIDAD)
+                            (gpsData?.data?.latitude && gpsData?.data?.longitude && 
+                             selectedAsset?.deviceDetails?.imei === gpsData?.deviceId) ||
+                            // Caso 2: Fallback a última ubicación de BD si no hay WebSocket
+                            (selectedAsset.lastLocation && selectedAsset.lastLocation.latitude && selectedAsset.lastLocation.longitude)
                         ) ? (
                         <div className="relative w-full h-full">
                             <DeviceMap
-                                key={`${selectedAsset.id}-${selectedAsset.lastLocation?.timestamp || Date.now()}-${selectedAsset.lastLocation?.latitude || gpsData?.data?.latitude}-${selectedAsset.lastLocation?.longitude || gpsData?.data?.longitude}`}
-                                latitude={selectedAsset.lastLocation?.latitude || gpsData?.data?.latitude || 0}
-                                longitude={selectedAsset.lastLocation?.longitude || gpsData?.data?.longitude || 0}
+                                key={`${selectedAsset.id}-${gpsData?.timestamp || selectedAsset.lastLocation?.timestamp || Date.now()}-${gpsData?.data?.latitude || selectedAsset.lastLocation?.latitude}-${gpsData?.data?.longitude || selectedAsset.lastLocation?.longitude}`}
+                                latitude={gpsData?.data?.latitude || selectedAsset.lastLocation?.latitude || 0}
+                                longitude={gpsData?.data?.longitude || selectedAsset.lastLocation?.longitude || 0}
                                 deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand || 'N/A'} ${selectedAsset.deviceDetails?.model || 'N/A'})`}
                                 className="w-full h-full"
                                 historyLocations={selectedAsset.recentPoints || []}
@@ -754,10 +754,10 @@ export default function MapPage() {
                                         {selectedAsset.name}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                        {selectedAsset.lastLocation?.latitude ? 
-                                            `${selectedAsset.lastLocation.latitude.toFixed(6)}, ${selectedAsset.lastLocation.longitude.toFixed(6)}` :
-                                            (gpsData?.data?.latitude ? 
-                                                `${gpsData.data.latitude.toFixed(6)}, ${gpsData.data.longitude.toFixed(6)}` :
+                                        {gpsData?.data?.latitude ? 
+                                            `${gpsData.data.latitude.toFixed(6)}, ${gpsData.data.longitude.toFixed(6)} (Tiempo Real)` :
+                                            (selectedAsset.lastLocation?.latitude ? 
+                                                `${selectedAsset.lastLocation.latitude.toFixed(6)}, ${selectedAsset.lastLocation.longitude.toFixed(6)} (Última Conocida)` :
                                                 'Sin coordenadas'
                                             )
                                         }
