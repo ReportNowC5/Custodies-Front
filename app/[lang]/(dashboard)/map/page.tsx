@@ -190,7 +190,7 @@ export default function MapPage() {
                                             deviceId: deviceDetails.imei,
                                             from: veryOldDate,
                                             to: now,
-                                            limit: 20
+                                            limit: 10 // Reducido a 10 para mejor rendimiento en tiempo real
                                         });
 
                                         // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
@@ -434,9 +434,9 @@ export default function MapPage() {
                 return prevAsset;
             }
             
-            // Mantener las últimas 20 posiciones para el trazado en tiempo real
+            // Mantener las últimas 10 posiciones para el trazado en tiempo real
             const currentPoints = prevAsset.recentPoints || [];
-            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
+            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
             
             const updatedAsset = {
                 ...prevAsset,
@@ -462,9 +462,9 @@ export default function MapPage() {
         setAssets(prevAssets => 
             prevAssets.map(asset => {
                 if (asset.id === selectedAsset.id) {
-                    // Mantener las últimas 20 posiciones para el trazado
+                    // Mantener las últimas 10 posiciones para el trazado
                     const currentPoints = asset.recentPoints || [];
-                    const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 20);
+                    const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
                     
                     return {
                         ...asset,
@@ -685,21 +685,21 @@ export default function MapPage() {
                         ) ? (
                         <div className="relative w-full h-full">
                             <DeviceMap
-                                key={`${selectedAsset.id}-${gpsData?.timestamp || selectedAsset.lastLocation?.timestamp || Date.now()}-${gpsData?.data?.latitude || selectedAsset.lastLocation?.latitude}-${gpsData?.data?.longitude || selectedAsset.lastLocation?.longitude}`}
+                                key={`realtime-${selectedAsset.id}-${selectedAsset.deviceDetails?.imei || 'no-imei'}`}
                                 latitude={gpsData?.data?.latitude || selectedAsset.lastLocation?.latitude || 0}
                                 longitude={gpsData?.data?.longitude || selectedAsset.lastLocation?.longitude || 0}
                                 deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand || 'N/A'} ${selectedAsset.deviceDetails?.model || 'N/A'})`}
                                 className="w-full h-full"
-                                historyLocations={selectedAsset.recentPoints || []}
-                                showRoute={true} // Siempre mostrar ruta para trazado en tiempo real
-                                routeColor="#10B981" // Verde para tiempo real
-                                routeWeight={5} // Línea más gruesa para mejor visibilidad en tiempo real
-                                fitToRoute={false}
-                                shouldFlyTo={false} // Desactivar flyTo para evitar saltos bruscos en tiempo real
+                                historyLocations={selectedAsset.recentPoints?.slice(0, 10) || []} // Máximo 10 puntos
+                                showRoute={true} // Habilitar trazado de ruta
+                                routeColor="#10B981" // Verde esmeralda para tiempo real
+                                routeWeight={4} // Grosor óptimo para visibilidad
+                                fitToRoute={false} // No ajustar vista automáticamente
+                                shouldFlyTo={!!gpsData?.data} // Solo seguir cuando hay datos WebSocket
                                 isPlaying={false}
-                                currentLocationIndex={selectedAsset.recentPoints?.length || 0}
+                                currentLocationIndex={0} // Siempre mostrar la posición más reciente
                                 showProgressiveRoute={false}
-                                isHistoryView={false} // Modo tiempo real, no historial
+                                isHistoryView={false} // Modo tiempo real activo
                                 hasValidCoordinates={true}
                                 isConnected={selectedAsset?.deviceDetails?.imei ? 
                             (isDeviceConnected(selectedAsset.deviceDetails.imei) || selectedAsset.isOnline || false) : 
@@ -737,12 +737,25 @@ export default function MapPage() {
                         )}
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">
-                                        {selectedAsset.recentPoints?.length || 0} puntos GPS hoy
+                                        {selectedAsset.recentPoints?.length || 0} puntos GPS (máx. 10)
                                         {selectedAsset.lastLocation && (
                                             <div className="mt-1">
                                                 Última actividad: {new Date(selectedAsset.lastLocation.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                                             </div>
                                         )}
+                                        <div className="mt-1 flex items-center gap-1">
+                                            {gpsData?.data ? (
+                                                <>
+                                                    <span className="text-green-600">🔴</span>
+                                                    <span className="text-green-600 font-medium">TIEMPO REAL</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="text-orange-500">📍</span>
+                                                    <span className="text-orange-500">Última conocida</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </Card>
                             </div>
@@ -754,13 +767,21 @@ export default function MapPage() {
                                         {selectedAsset.name}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                        {gpsData?.data?.latitude ? 
-                                            `${gpsData.data.latitude.toFixed(6)}, ${gpsData.data.longitude.toFixed(6)} (Tiempo Real)` :
-                                            (selectedAsset.lastLocation?.latitude ? 
-                                                `${selectedAsset.lastLocation.latitude.toFixed(6)}, ${selectedAsset.lastLocation.longitude.toFixed(6)} (Última Conocida)` :
-                                                'Sin coordenadas'
-                                            )
-                                        }
+                                        {gpsData?.data?.latitude ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-green-600">🔴</span>
+                                                <span>{gpsData.data.latitude.toFixed(6)}, {gpsData.data.longitude.toFixed(6)}</span>
+                                                <span className="text-green-600 font-medium">(TIEMPO REAL)</span>
+                                            </div>
+                                        ) : selectedAsset.lastLocation?.latitude ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-orange-500">📍</span>
+                                                <span>{selectedAsset.lastLocation.latitude.toFixed(6)}, {selectedAsset.lastLocation.longitude.toFixed(6)}</span>
+                                                <span className="text-orange-500">(Última Conocida)</span>
+                                            </div>
+                                        ) : (
+                                            'Sin coordenadas'
+                                        )}
                                     </div>
                                     {(gpsData?.data?.course || gpsData?.data?.rumbo) && (
                                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -775,7 +796,18 @@ export default function MapPage() {
                                         }
                                     </div>
                                     <div className="text-xs text-muted-foreground mt-1">
-                                        🔄 Tiempo real: {isConnected ? 'Activo' : 'Inactivo'} | WebSocket: {gpsData ? '✅' : '❌'}
+                                        <div className="flex items-center gap-2">
+                                            <span>🔄 WebSocket:</span>
+                                            <span className={isConnected ? 'text-green-600' : 'text-red-500'}>
+                                                {isConnected ? 'Conectado' : 'Desconectado'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span>📡 Datos GPS:</span>
+                                            <span className={gpsData?.data ? 'text-green-600' : 'text-orange-500'}>
+                                                {gpsData?.data ? 'Tiempo Real' : 'Históricos'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </Card>
                             </div>
