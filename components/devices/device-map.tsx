@@ -764,7 +764,7 @@ const LeafletMapComponent: React.FC<{
 
         }, [isPlaying, isHistoryView, getMarkerRotation, createCustomIcon, interpolateBearing]);
 
-        // useEffect para actualizar posición y orientación con throttling optimizado - SIEMPRE se ejecuta
+        // useEffect para actualizar posición del marcador - SIMPLIFICADO para tiempo real
         useEffect(() => {
             console.log('🔍 DEBUG DeviceMap useEffect triggered:', {
                 latitude,
@@ -781,8 +781,7 @@ const LeafletMapComponent: React.FC<{
                 console.log('🔍 DEBUG DeviceMap: Actualizando posición del marcador:', {
                     from: markerRef.current.getLatLng(),
                     to: [latitude, longitude],
-                    isHistoryView,
-                    shouldFlyTo
+                    isHistoryView
                 });
                 
                 // Actualizar timestamp de última actualización real
@@ -791,41 +790,21 @@ const LeafletMapComponent: React.FC<{
                 // Detener predicción cuando llegan datos reales
                 stopPredictiveUpdates();
                 
-                // Aplicar throttling inteligente
-                const shouldUpdate = isHistoryView ? throttlerRef.current.shouldUpdate() : true; // Siempre actualizar en tiempo real
-                
-                console.log('🔍 DEBUG DeviceMap: shouldUpdate =', shouldUpdate);
-                
-                if (shouldUpdate) {
-                    // Usar interpolación suave para tiempo real
-                    if (!isHistoryView) {
-                        console.log('🔍 DEBUG DeviceMap: Usando updateMarkerPositionSmooth para tiempo real');
-                        updateMarkerPositionSmooth(latitude, longitude);
-                        
-                        // Iniciar predicción para futuras pérdidas de señal
-                        setTimeout(() => {
-                            startPredictiveUpdates();
-                        }, 1000);
-                    } else {
-                        console.log('🔍 DEBUG DeviceMap: Usando animación CSS para historial');
-                        // Para vista de historial, usar animación CSS más simple
-                        const newPosition: [number, number] = [latitude, longitude];
-                        const markerElement = markerRef.current.getElement();
-                        
-                        if (markerElement) {
-                            markerElement.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
-                        }
-                        
-                        markerRef.current.setLatLng(newPosition);
-                        
-                        // Actualizar orientación
-                        const rotation = getMarkerRotation();
-                        const newIcon = createCustomIcon(rotation);
-                        markerRef.current.setIcon(newIcon);
-                    }
-
-                    // Centrado automático suave SOLO para vista en tiempo real (no historial)
-                    if (!shouldFlyTo && !isHistoryView && !userInteractedRef.current && !isAnimatingRef.current) {
+                // Para tiempo real, actualizar inmediatamente sin throttling
+                if (!isHistoryView) {
+                    console.log('🔍 DEBUG DeviceMap: Actualizando marcador en tiempo real');
+                    
+                    // Actualizar posición del marcador directamente
+                    const newPosition: [number, number] = [latitude, longitude];
+                    markerRef.current.setLatLng(newPosition);
+                    
+                    // Actualizar orientación
+                    const rotation = getMarkerRotation();
+                    const newIcon = createCustomIcon(rotation);
+                    markerRef.current.setIcon(newIcon);
+                    
+                    // Centrado automático suave SOLO si el usuario no ha interactuado
+                    if (!userInteractedRef.current) {
                         console.log('🔍 DEBUG DeviceMap: Centrando mapa automáticamente');
                         lastAutoMoveRef.current = Date.now();
 
@@ -835,14 +814,28 @@ const LeafletMapComponent: React.FC<{
                             duration: 0.5,
                             easeLinearity: 0.25
                         });
-
-                        // Reset flag de interacción después de un tiempo más corto
-                        setTimeout(() => {
-                            userInteractedRef.current = false;
-                        }, 1500);
                     }
+                    
+                    // Iniciar predicción para futuras pérdidas de señal
+                    setTimeout(() => {
+                        startPredictiveUpdates();
+                    }, 1000);
                 } else {
-                    console.log('🔍 DEBUG DeviceMap: Actualización omitida por throttling');
+                    // Para vista de historial, usar animación CSS más simple
+                    console.log('🔍 DEBUG DeviceMap: Usando animación CSS para historial');
+                    const newPosition: [number, number] = [latitude, longitude];
+                    const markerElement = markerRef.current.getElement();
+                    
+                    if (markerElement) {
+                        markerElement.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+                    }
+                    
+                    markerRef.current.setLatLng(newPosition);
+                    
+                    // Actualizar orientación
+                    const rotation = getMarkerRotation();
+                    const newIcon = createCustomIcon(rotation);
+                    markerRef.current.setIcon(newIcon);
                 }
             } else {
                 console.log('🔍 DEBUG DeviceMap: Condiciones no cumplidas:', {
@@ -851,7 +844,7 @@ const LeafletMapComponent: React.FC<{
                     hasValidCoordinates
                 });
             }
-        }, [latitude, longitude, shouldFlyTo, hasValidCoordinates, isPlaying, isHistoryView, updateMarkerPositionSmooth, stopPredictiveUpdates, startPredictiveUpdates]);
+        }, [latitude, longitude, hasValidCoordinates, isHistoryView, getMarkerRotation, createCustomIcon, stopPredictiveUpdates, startPredictiveUpdates]);
 
         // useEffect para flyTo - OPTIMIZADO para respetar interacción del usuario
         useEffect(() => {
@@ -1164,8 +1157,8 @@ const LeafletMapComponent: React.FC<{
                     </>
                 )}
 
-                {/* Marcador personalizado */}
-                {/*<Marker
+                {/* Marcador principal para ubicación actual */}
+                <Marker
                     position={[latitude, longitude]}
                     icon={createCustomIcon(getMarkerRotation())}
                 >
@@ -1226,7 +1219,7 @@ const LeafletMapComponent: React.FC<{
                             </div>
                         </div>
                     </Popup>
-                </Marker>*/}
+                </Marker>
             </MapContainer>
         );
     };
