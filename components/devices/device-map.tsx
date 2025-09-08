@@ -938,12 +938,12 @@ const LeafletMapComponent: React.FC<{
                         <div style={{ fontSize: '14px', color: '#D1D5DB', marginBottom: '8px' }}>
                             {isConnected ? 'Conectado - Recibiendo datos GPS' : 'Conectando al dispositivo...'}
                         </div>
-                        {isConnected && (
+                        {/* {isConnected && (
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                 <div style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '50%', animation: 'pulse 2s infinite' }}></div>
                                 <span style={{ fontSize: '12px', color: '#10B981' }}>En línea</span>
                             </div>
-                        )}
+                        )} */}
                     </div>
                 )}
 
