@@ -260,15 +260,29 @@ export default function DeviceDetailPage() {
         }
     }, [getEffectiveLastConnection]);
 
-    // Actualizar estado de conexión basado en datos reales del dispositivo
+    // Actualizar estado de conexión basado en datos reales del dispositivo y WebSocket
     const [isDeviceOnline, setIsDeviceOnline] = useState<boolean>(false);
     useEffect(() => {
         // Determinar si el dispositivo está realmente conectado
-        const isReallyConnected = deviceConnectionStatus === 'connected' || 
+        // Prioridad: WebSocket conectado Y recibiendo datos GPS del dispositivo
+        const isWebSocketConnected = isConnected && gpsData?.deviceId === device?.imei;
+        const isReallyConnected = isWebSocketConnected || 
+                                 deviceConnectionStatus === 'connected' || 
                                  deviceStatus?.data?.summary?.is_connected || 
                                  false;
+        
+        console.log(`🔄 Actualizando estado de conexión para dispositivo ${device?.imei}:`, {
+            isWebSocketConnected,
+            isConnected,
+            gpsDeviceId: gpsData?.deviceId,
+            deviceImei: device?.imei,
+            deviceConnectionStatus,
+            dbConnected: deviceStatus?.data?.summary?.is_connected,
+            finalStatus: isReallyConnected
+        });
+        
         setIsDeviceOnline(isReallyConnected);
-    }, [deviceConnectionStatus, deviceStatus?.data?.summary?.is_connected]);
+    }, [isConnected, gpsData?.deviceId, device?.imei, deviceConnectionStatus, deviceStatus?.data?.summary?.is_connected]);
 
     // Actualizar datos de batería cuando lleguen datos de estado
     useEffect(() => {
@@ -407,7 +421,7 @@ export default function DeviceDetailPage() {
                         shouldShakeMarker={mapAnimations.shouldShakeMarker}
                         onAnimationComplete={mapAnimations.onAnimationComplete}
                         hasValidCoordinates={!!mapCoordinates || !!deviceStatus?.data?.summary?.has_location}
-                        isConnected={isConnected || deviceStatus?.data?.summary?.is_connected || false}
+                        isConnected={isDeviceOnline}
                         lastLocationUpdate={lastPosition?.timestamp || deviceStatus?.data?.location?.timestamp || null}
                         theme={mode}
                     />
@@ -491,7 +505,7 @@ export default function DeviceDetailPage() {
                                     })()}
                                 </div>
                                 {/* Mostrar información adicional basada en el estado */}
-                                {isDeviceOnline && deviceConnectionStatus === 'connected' && (
+                                {isDeviceOnline && isConnected && gpsData?.deviceId === device?.imei && (
                                     <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                                         Conectado en tiempo real
@@ -508,9 +522,10 @@ export default function DeviceDetailPage() {
                                 )}
                                 {/* Mostrar fuente de datos */}
                                 {(() => {
-                                    const wsConnection = deviceLastConnection;
+                                    const isWebSocketActive = isConnected && gpsData?.deviceId === device?.imei;
                                     const dbConnection = deviceStatus?.data?.connection?.connected_at;
-                                    if (wsConnection && deviceConnectionStatus === 'connected') {
+                                    
+                                    if (isWebSocketActive) {
                                         return (
                                             <div className="text-xs text-blue-500 mt-1">
                                                 📡 Datos en tiempo real
