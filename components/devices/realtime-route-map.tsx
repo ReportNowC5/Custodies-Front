@@ -43,13 +43,17 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
     useEffect(() => setIsClient(true), []);
 
     const points = useMemo<DeviceHistoryLocation[]>(() => {
-        const base = [...(initialHistory || [])];
-        if (livePoint) {
-            // ensure newest-first uniqueness by timestamp
+        const isValid = (p: DeviceHistoryLocation | null | undefined) => !!p &&
+            typeof p.latitude === 'number' && typeof p.longitude === 'number' &&
+            !isNaN(p.latitude) && !isNaN(p.longitude) &&
+            p.latitude >= -90 && p.latitude <= 90 &&
+            p.longitude >= -180 && p.longitude <= 180;
+
+        const base = (initialHistory || []).filter(isValid);
+        if (livePoint && isValid(livePoint)) {
             const exists = base.find(p => p.timestamp === livePoint.timestamp);
-            if (!exists) base.unshift(livePoint);
+            if (!exists) base.unshift(livePoint as DeviceHistoryLocation);
         }
-        // keep only latest 10
         return base
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 10);
@@ -80,6 +84,10 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
     // Initialize marker when map ready and we have coords
     useEffect(() => {
         if (!mapRef.current || markerRef.current || !hasAnyCoords) return;
+        if (
+            typeof currentLat !== 'number' || typeof currentLng !== 'number' ||
+            isNaN(currentLat) || isNaN(currentLng)
+        ) return;
         const marker = L.marker([currentLat, currentLng]).addTo(mapRef.current);
         markerRef.current = marker;
     }, [hasAnyCoords, currentLat, currentLng]);
@@ -87,7 +95,9 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
     // Update marker only if connected and we have live coords
     useEffect(() => {
         if (!mapRef.current || !markerRef.current) return;
-        if (isConnected && hasAnyCoords) {
+        if (isConnected && hasAnyCoords &&
+            typeof currentLat === 'number' && typeof currentLng === 'number' &&
+            !isNaN(currentLat) && !isNaN(currentLng)) {
             markerRef.current.setLatLng([currentLat, currentLng]);
             // Do not change zoom automatically; keep user zoom
             if (!userInteractedRef.current) {
@@ -121,7 +131,7 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
                 />
 
                 {/* Route polyline */}
-                {points.length > 1 && (
+                {points.length > 1 && typeof currentLat === 'number' && typeof currentLng === 'number' && !isNaN(currentLat) && !isNaN(currentLng) && (
                     <Polyline
                         positions={points
                             .slice()
@@ -132,7 +142,7 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
                 )}
 
                 {/* Live marker - only when connected and we have coordinates */}
-                {isConnected && hasAnyCoords && (
+                {isConnected && hasAnyCoords && typeof currentLat === 'number' && typeof currentLng === 'number' && !isNaN(currentLat) && !isNaN(currentLng) && (
                     <Marker position={[currentLat, currentLng]} />
                 )}
             </MapContainer>
