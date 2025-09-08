@@ -29,6 +29,7 @@ import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 import { useMultipleDevicesWebSocket } from '@/hooks/use-multiple-devices-websocket';
 import { useResizableLayout } from '@/hooks/use-resizable-layout';
 import { ResizeDivider } from '@/components/ui/resize-divider';
+import { RealtimeRouteMap } from '@/components/devices/realtime-route-map';
 import {
     ArrowLeft,
     Hash,
@@ -179,7 +180,7 @@ export default function MapPage() {
                                 const deviceDetails = await devicesService.getById(asset.device.id);
                                 enrichedAsset.deviceDetails = deviceDetails;
 
-                                // Obtener las últimas 20 posiciones sin restricción de fecha
+                                // Obtener las últimas 5 posiciones
                                 if (deviceDetails.imei) {
                                     try {
                                         // Usar un rango de fechas muy amplio para obtener todo el historial disponible
@@ -190,14 +191,14 @@ export default function MapPage() {
                                             deviceId: deviceDetails.imei,
                                             from: veryOldDate,
                                             to: now,
-                                            limit: 10 // Reducido a 10 para mejor rendimiento en tiempo real
+                                            limit: 5 // Solo 5 para carga inicial
                                         });
 
                                         // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
                                         const sortedHistory = recentHistory
                                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-                                        enrichedAsset.recentPoints = sortedHistory;
+                                        enrichedAsset.recentPoints = sortedHistory.slice(0, 5);
 
                                         if (sortedHistory.length > 0) {
                                             const latest = sortedHistory[0]; // El más reciente
@@ -207,14 +208,8 @@ export default function MapPage() {
                                                 timestamp: latest.timestamp
                                             };
                                             
-                                            // Usar lógica más agresiva para detección inicial
-                                            const timeSinceLastUpdate = (new Date().getTime() - new Date(latest.timestamp).getTime()) / (1000 * 60);
-                                            enrichedAsset.isOnline = timeSinceLastUpdate <= 5; // 5 minutos para consistencia
-                                            
-                                            console.log(`📍 Cargadas ${sortedHistory.length} posiciones históricas para ${asset.name} - Última: ${Math.round(timeSinceLastUpdate)}min ago`);
+                                            console.log(`📍 Cargadas ${enrichedAsset.recentPoints.length} posiciones históricas para ${asset.name}`);
                                         } else {
-                                            // Sin datos recientes = desconectado
-                                            enrichedAsset.isOnline = false;
                                             console.log(`⚠️ Sin datos GPS recientes para ${asset.name}`);
                                         }
                                     } catch (historyError) {
@@ -632,7 +627,7 @@ export default function MapPage() {
                     className="order-2"
                 />
 
-                {/* Right Panel - Real-time Map */}
+                {/* Right Panel - Real-time Map (rediseñado con RealtimeRouteMap) */}
                 <div
                     className="order-3 relative h-64 lg:h-full transition-all duration-200 ease-out"
                     style={{
@@ -640,174 +635,30 @@ export default function MapPage() {
                         flex: isDesktop ? 'none' : '1'
                     }}
                 >
-                    {selectedAsset && (
-                            // Verificar que tenemos coordenadas válidas (GPS en tiempo real o última ubicación)
-                            (gpsData?.data?.latitude && gpsData?.data?.longitude && 
-                             selectedAsset?.deviceDetails?.imei === gpsData?.deviceId) ||
-                            (selectedAsset.lastLocation && selectedAsset.lastLocation.latitude && selectedAsset.lastLocation.longitude)
-                        ) ? (
-                        <div className="relative w-full h-full">
-                            <DeviceMap
-                                key={`realtime-${selectedAsset.id}-${selectedAsset.deviceDetails?.imei || 'no-imei'}`}
-                                // PRIORIDAD: Usar datos GPS en tiempo real si están disponibles, sino usar última ubicación
-                                latitude={gpsData?.data?.latitude || selectedAsset.lastLocation?.latitude || 0}
-                                longitude={gpsData?.data?.longitude || selectedAsset.lastLocation?.longitude || 0}
-                                deviceName={`${selectedAsset.name} (${selectedAsset.deviceDetails?.brand || 'N/A'} ${selectedAsset.deviceDetails?.model || 'N/A'})`}
-                                className="w-full h-full"
-                                historyLocations={selectedAsset.recentPoints?.slice(0, 10) || []} // Máximo 10 puntos para la ruta
-                                showRoute={true} // Habilitar trazado de ruta
-                                routeColor="#10B981" // Verde esmeralda para tiempo real
-                                routeWeight={4} // Grosor óptimo para visibilidad
-                                fitToRoute={false} // No ajustar vista automáticamente
-                                shouldFlyTo={false} // No usar flyTo, usar panTo suave
-                                isPlaying={false}
-                                currentLocationIndex={0} // Siempre mostrar la posición más reciente
-                                showProgressiveRoute={false}
-                                isHistoryView={false} // Modo tiempo real activo
-                                hasValidCoordinates={true}
-                                isConnected={selectedAsset?.deviceDetails?.imei ? 
-                                    (isDeviceConnected(selectedAsset.deviceDetails.imei) || selectedAsset.isOnline || false) : 
-                                    (selectedAsset?.isOnline || false)
-                                }
-                                lastLocationUpdate={gpsData?.data ? new Date().toISOString() : selectedAsset.lastLocation?.timestamp}
-                                theme={mode}
-                                currentBearing={gpsData?.data?.course || gpsData?.data?.rumbo}
-                            />
-
-                            {/* Speed Legend */}
-                            {selectedAsset.recentPoints && selectedAsset.recentPoints.length > 0 && (
-                                <div className="absolute top-4 right-4 z-10">
-                                    <SpeedLegend compact={true} className="bg-card/95 backdrop-blur-sm border border-border shadow-lg" />
-                                </div>
-                            )}
-
-                            {/* Connection Status */}
-                            <div className="absolute top-4 left-4 z-10">
-                                <Card className="p-3 bg-card/95 backdrop-blur-sm border border-border shadow-lg">
-                                    <div className="flex items-center gap-2">
-                                        {(selectedAsset?.deviceDetails?.imei ? 
-                            isDeviceConnected(selectedAsset.deviceDetails.imei) : 
-                            selectedAsset?.isOnline
-                        ) ? (
-                            <>
-                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium text-green-600">Conectado</span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                                <span className="text-sm font-medium text-red-600">Desconectado</span>
-                            </>
-                        )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                        {selectedAsset.recentPoints?.length || 0} puntos GPS (máx. 10)
-                                        {selectedAsset.lastLocation && (
-                                            <div className="mt-1">
-                                                Última actividad: {new Date(selectedAsset.lastLocation.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                                            </div>
-                                        )}
-                                        <div className="mt-1 flex items-center gap-1">
-                                            {gpsData?.data ? (
-                                                <>
-                                                    <span className="text-green-600">🔴</span>
-                                                    <span className="text-green-600 font-medium">TIEMPO REAL</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className="text-orange-500">📍</span>
-                                                    <span className="text-orange-500">Última conocida</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
-
-                            {/* Asset Info */}
-                            <div className="absolute bottom-4 left-4 z-10">
-                                <Card className="p-3 bg-card/95 backdrop-blur-sm border border-border shadow-lg max-w-xs">
-                                    <div className="text-sm font-medium text-foreground mb-1">
-                                        {selectedAsset.name}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {gpsData?.data?.latitude ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-green-600">🔴</span>
-                                                <span>{gpsData.data.latitude.toFixed(6)}, {gpsData.data.longitude.toFixed(6)}</span>
-                                                <span className="text-green-600 font-medium">(TIEMPO REAL)</span>
-                                            </div>
-                                        ) : selectedAsset.lastLocation?.latitude ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-orange-500">📍</span>
-                                                <span>{selectedAsset.lastLocation.latitude.toFixed(6)}, {selectedAsset.lastLocation.longitude.toFixed(6)}</span>
-                                                <span className="text-orange-500">(Última Conocida)</span>
-                                            </div>
-                                        ) : (
-                                            'Sin coordenadas'
-                                        )}
-                                    </div>
-                                    {(gpsData?.data?.course || gpsData?.data?.rumbo) && (
-                                        <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                            <span>🧭</span>
-                                            <span>Orientación: {(gpsData.data.course || gpsData.data.rumbo).toFixed(1)}°</span>
-                                        </div>
-                                    )}
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                        Última actualización: {selectedAsset.lastLocation?.timestamp ? 
-                                            formatDate(selectedAsset.lastLocation.timestamp) : 
-                                            'Sin datos'
-                                        }
-                                    </div>
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                        <div className="flex items-center gap-2">
-                                            <span>🔄 WebSocket:</span>
-                                            <span className={isConnected ? 'text-green-600' : 'text-red-500'}>
-                                                {isConnected ? 'Conectado' : 'Desconectado'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span>📡 Datos GPS:</span>
-                                            <span className={gpsData?.data ? 'text-green-600' : 'text-orange-500'}>
-                                                {gpsData?.data ? 'Tiempo Real' : 'Históricos'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
-                        </div>
+                    {selectedAsset ? (
+                        <RealtimeRouteMap
+                            imei={selectedAsset.deviceDetails?.imei || ''}
+                            theme={mode}
+                            initialHistory={(selectedAsset.recentPoints || []).slice(0, 5)}
+                            livePoint={gpsData?.data && selectedAsset.deviceDetails?.imei === gpsData.deviceId ? {
+                                id: Date.now(),
+                                deviceId: gpsData.deviceId,
+                                latitude: gpsData.data.latitude || gpsData.data.lat,
+                                longitude: gpsData.data.longitude || gpsData.data.lng,
+                                timestamp: new Date().toISOString(),
+                                course: gpsData.data.course || gpsData.data.rumbo || 0,
+                                speed: gpsData.data.speed || 0,
+                                createdAt: new Date().toISOString()
+                            } : null}
+                            isConnected={!!(gpsData?.data && selectedAsset.deviceDetails?.imei === gpsData.deviceId)}
+                            className="w-full h-full"
+                        />
                     ) : (
                         <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                             <div className="text-center max-w-md px-4">
-                                {selectedAsset ? (
-                                    <>
-                                        <WifiOff className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
-                                        <p className="text-sm lg:text-base text-muted-foreground font-medium">
-                                            Sin datos de ubicación
-                                        </p>
-                                        <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">
-                                            {selectedAsset.deviceDetails ? 
-                                                `El dispositivo ${selectedAsset.deviceDetails.brand} ${selectedAsset.deviceDetails.model} no tiene datos GPS recientes` :
-                                                'Este activo no tiene un dispositivo GPS asociado'
-                                            }
-                                        </p>
-                                        {selectedAsset.deviceDetails?.imei && (
-                                            <p className="text-xs text-muted-foreground/50 mt-2 font-mono">
-                                                IMEI: {selectedAsset.deviceDetails.imei}
-                                            </p>
-                                        )}
-                                    </>
-                                ) : (
-                                    <>
-                                        <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
-                                        <p className="text-sm lg:text-base text-muted-foreground font-medium">
-                                            Selecciona un activo
-                                        </p>
-                                        <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">
-                                            Elige un activo de la lista para ver su ubicación en tiempo real
-                                        </p>
-                                    </>
-                                )}
+                                <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
+                                <p className="text-sm lg:text-base text-muted-foreground font-medium">Selecciona un activo</p>
+                                <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">Elige un activo de la lista para ver su ubicación en tiempo real</p>
                             </div>
                         </div>
                     )}
