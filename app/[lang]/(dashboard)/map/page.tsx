@@ -191,14 +191,15 @@ export default function MapPage() {
                                             deviceId: deviceDetails.imei,
                                             from: veryOldDate,
                                             to: now,
-                                            limit: 5 // Solo 5 para carga inicial
+                                            limit: 10 // Solo 5 para carga inicial
                                         });
 
                                         // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
                                         const sortedHistory = recentHistory
                                             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-                                        enrichedAsset.recentPoints = sortedHistory.slice(0, 5);
+                                        // enrichedAsset.recentPoints = sortedHistory.slice(0, 10);
+                                        enrichedAsset.recentPoints = sortedHistory;
 
                                         if (sortedHistory.length > 0) {
                                             const latest = sortedHistory[0]; // El más reciente
@@ -406,7 +407,8 @@ export default function MapPage() {
             
             // Mantener las últimas 10 posiciones para el trazado en tiempo real
             const currentPoints = prevAsset.recentPoints || [];
-            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
+            // const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
+            const updatedPoints = [newGpsPoint, ...currentPoints];
             
             return {
                 ...prevAsset,
@@ -424,7 +426,8 @@ export default function MapPage() {
             prevAssets.map(asset => {
                 if (asset.id === selectedAsset.id) {
                     const currentPoints = asset.recentPoints || [];
-                    const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
+                    // const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
+                    const updatedPoints = [newGpsPoint, ...currentPoints];
                     
                     return {
                         ...asset,
@@ -639,7 +642,8 @@ export default function MapPage() {
                         <RealtimeRouteMap
                             imei={selectedAsset.deviceDetails?.imei || ''}
                             theme={mode}
-                            initialHistory={(selectedAsset.recentPoints || []).slice(0, 5)}
+                            // initialHistory={(selectedAsset.recentPoints || []).slice(0, 10)}
+                            initialHistory={(selectedAsset.recentPoints || [])}
                             livePoint={gpsData?.data && selectedAsset.deviceDetails?.imei === gpsData.deviceId ? {
                                 id: Date.now(),
                                 deviceId: gpsData.deviceId,

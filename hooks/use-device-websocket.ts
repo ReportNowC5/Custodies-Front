@@ -109,9 +109,9 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
             });
 
             // Escuchar TODOS los eventos para debug
-            socket.onAny((eventName, ...args) => {
-                console.log('🎧 Evento recibido:', eventName, args);
-            });
+            // socket.onAny((eventName, ...args) => {
+            //     console.log('🎧 Evento recibido:', eventName, args);
+            // });
 
             // Manejar evento específico 'disconnected' del servidor
             socket.on('disconnected', (data) => {

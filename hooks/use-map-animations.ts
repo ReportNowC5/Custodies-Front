@@ -194,7 +194,6 @@ export const useMapAnimations = ({
   // Efecto para resetear el estado cuando se pierde la conexión
   useEffect(() => {
     if (!isConnected) {
-      console.log('🔌 Conexión perdida, reseteando animaciones');
       resetAnimations();
       setIsFirstLocation(true); // Resetear para que la próxima conexión active flyTo
     }

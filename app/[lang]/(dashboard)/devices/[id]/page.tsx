@@ -180,8 +180,6 @@ export default function DeviceDetailPage() {
 
     // Toast de debug para datos WebSocket recibidos
     useEffect(() => {
-        console.log('gpsData', gpsData);
-        
         if (gpsData && device?.imei) {
             let parsedData = gpsData;
             if (typeof gpsData === 'string') {
@@ -235,7 +233,6 @@ export default function DeviceDetailPage() {
     useEffect(() => {
         const validCoords = getValidCoordinates(gpsData);
         if (validCoords) {
-            console.log('📍 Actualizando coordenadas del mapa:', validCoords);
             setMapCoordinates(validCoords);
             setLastLocationUpdate(new Date().toISOString());
             setLastPosition({
