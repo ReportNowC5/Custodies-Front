@@ -582,110 +582,116 @@ export default function MapPage() {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2 text-sm">
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
                                             {asset.deviceDetails ? (
                                                 <>
-                                                    {/* No. telefónico */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Phone className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">No. telefónico</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                {asset.deviceDetails.client?.user?.phone || 'N/A'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* IMEI */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Hash className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">IMEI</div>
-                                                            <div className="text-xs font-medium text-foreground font-mono truncate">
-                                                                {asset.deviceDetails.imei}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Creado */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Calendar className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">Creado</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                {formatDate(asset.deviceDetails.createdAt)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Última conexión GPS */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Activity className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">Última conexión GPS</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                {asset.lastLocation?.timestamp ? formatDate(asset.lastLocation.timestamp) : 'Sin conexión'}
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 mt-1">
-                                                                💾 Datos de base de datos
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Última posición recibida */}
-                                                    {asset.lastLocation && (
+                                                    {/* Columna Izquierda */}
+                                                    <div className="space-y-2">
+                                                        {/* No. telefónico */}
                                                         <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <MapPin className="h-4 w-4" />
+                                                            <Phone className="h-4 w-4 flex-shrink-0" />
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Última posición recibida</div>
+                                                                <div className="text-xs text-muted-foreground">No. telefónico</div>
                                                                 <div className="text-xs font-medium text-foreground truncate">
-                                                                    {formatDate(asset.lastLocation.timestamp)}
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground mt-1">
-                                                                    {asset.lastLocation.latitude.toFixed(6)}, {asset.lastLocation.longitude.toFixed(6)}
-                                                                    {asset.recentPoints && asset.recentPoints.length > 0 && asset.recentPoints[0].speed && (
-                                                                        <span className="ml-2">• {asset.recentPoints[0].speed.toFixed(1)} km/h</span>
-                                                                    )}
+                                                                    {asset.deviceDetails.client?.user?.phone || 'N/A'}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    )}
 
-                                                    {/* Activo relacionado */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Truck className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">Activo relacionado</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                {asset.name}
+                                                        {/* IMEI */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Hash className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">IMEI</div>
+                                                                <div className="text-xs font-medium text-foreground font-mono truncate">
+                                                                    {asset.deviceDetails.imei}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Creado */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Calendar className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">Creado</div>
+                                                                <div className="text-xs font-medium text-foreground truncate">
+                                                                    {formatDate(asset.deviceDetails.createdAt)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Última conexión GPS */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Activity className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">Última conexión GPS</div>
+                                                                <div className="text-xs font-medium text-foreground truncate">
+                                                                    {asset.lastLocation?.timestamp ? formatDate(asset.lastLocation.timestamp) : 'Sin conexión'}
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                    💾 Datos de base de datos
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
 
-                                                    {/* Cliente */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Users className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">Cliente</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                {asset.deviceDetails.client?.user?.name || 'Report Now'}
+                                                    {/* Columna Derecha */}
+                                                    <div className="space-y-2">
+                                                        {/* Última posición recibida */}
+                                                        {asset.lastLocation && (
+                                                            <div className="flex items-center gap-2 text-muted-foreground">
+                                                                <MapPin className="h-4 w-4 flex-shrink-0" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="text-xs text-muted-foreground">Última posición recibida</div>
+                                                                    <div className="text-xs font-medium text-foreground truncate">
+                                                                        {formatDate(asset.lastLocation.timestamp)}
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                                        {asset.lastLocation.latitude.toFixed(6)}, {asset.lastLocation.longitude.toFixed(6)}
+                                                                        {asset.recentPoints && asset.recentPoints.length > 0 && asset.recentPoints[0].speed && (
+                                                                            <span className="ml-2">• {asset.recentPoints[0].speed.toFixed(1)} km/h</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Activo relacionado */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Truck className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">Activo relacionado</div>
+                                                                <div className="text-xs font-medium text-foreground truncate">
+                                                                    {asset.name}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
 
-                                                    {/* Carga del dispositivo */}
-                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                        <Battery className="h-4 w-4" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-xs text-muted-foreground">Carga del dispositivo</div>
-                                                            <div className="text-xs font-medium text-foreground truncate">
-                                                                Sin datos
+                                                        {/* Cliente */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Users className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">Cliente</div>
+                                                                <div className="text-xs font-medium text-foreground truncate">
+                                                                    {asset.deviceDetails.client?.user?.name || 'Report Now'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Carga del dispositivo */}
+                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                            <Battery className="h-4 w-4 flex-shrink-0" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-xs text-muted-foreground">Carga del dispositivo</div>
+                                                                <div className="text-xs font-medium text-foreground truncate">
+                                                                    Sin datos
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </>
                                             ) : (
-                                                <div className="flex items-center gap-2 text-muted-foreground">
+                                                <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
                                                     <WifiOff className="h-4 w-4" />
                                                     <span className="text-xs">Sin dispositivo GPS</span>
                                                 </div>
