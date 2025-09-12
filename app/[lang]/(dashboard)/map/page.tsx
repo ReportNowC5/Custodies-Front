@@ -25,6 +25,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SpeedLegend } from '@/components/ui/speed-legend';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 import { useMultipleDevicesWebSocket } from '@/hooks/use-multiple-devices-websocket';
 import { useResizableLayout } from '@/hooks/use-resizable-layout';
@@ -44,7 +47,11 @@ import {
     Clock,
     Phone,
     Calendar,
-    Battery
+    Battery,
+    History,
+    Filter,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from "next-themes";
@@ -97,7 +104,29 @@ interface AssetWithDevice extends AssetResponse {
     isOnline?: boolean;
     lastLocation?: { latitude: number; longitude: number; timestamp: string };
     recentPoints?: DeviceHistoryLocation[];
+    historicalData?: DeviceHistoryLocation[]; // Datos históricos filtrados
 }
+
+// Interfaz para el estado de filtros de historial
+interface HistoryFilter {
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
+}
+
+// Función para obtener fechas por defecto (últimas 24 horas)
+const getDefaultDateRange = () => {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    return {
+        startDate: yesterday.toISOString().split('T')[0],
+        startTime: '00:00',
+        endDate: now.toISOString().split('T')[0],
+        endTime: '23:59'
+    };
+};
 
 // Función para determinar si un dispositivo está conectado basado en su última actividad (fallback)
 const isDeviceConnectedFallback = (lastLocation?: { timestamp: string }) => {
@@ -117,6 +146,12 @@ export default function MapPage() {
     const [selectedAsset, setSelectedAsset] = useState<AssetWithDevice | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    // Estados para el sistema de historial
+    const [assetsWithHistoryEnabled, setAssetsWithHistoryEnabled] = useState<Set<number>>(new Set());
+    const [historyFilters, setHistoryFilters] = useState<Record<number, HistoryFilter>>({});
+    const [loadingHistory, setLoadingHistory] = useState<Set<number>>(new Set());
+    const [expandedHistoryControls, setExpandedHistoryControls] = useState<Set<number>>(new Set());
 
     // Theme configuration
     const { theme, setTheme, resolvedTheme: mode } = useTheme();
@@ -251,9 +286,12 @@ export default function MapPage() {
 
     // Efecto para actualizar el estado de conexión de los assets con datos del WebSocket múltiple
     useEffect(() => {
-        if (assets.length > 0 && devicesConnectionMap.size > 0) {
-            setAssets(prevAssets => 
-                prevAssets.map(asset => {
+        if (devicesConnectionMap.size > 0) {
+            setAssets(prevAssets => {
+                if (prevAssets.length === 0) return prevAssets;
+                
+                let hasChanges = false;
+                const updatedAssets = prevAssets.map(asset => {
                     if (asset.deviceDetails?.imei) {
                         const deviceState = getDeviceState(asset.deviceDetails.imei);
                         
@@ -271,6 +309,7 @@ export default function MapPage() {
                             // Solo actualizar si el estado realmente cambió
                             if (asset.isOnline !== connectionStatus) {
                                 console.log(`🔄 Actualizando estado de ${asset.name} (${asset.deviceDetails.imei}): ${asset.isOnline} → ${connectionStatus}`);
+                                hasChanges = true;
                                 return {
                                     ...asset,
                                     isOnline: connectionStatus
@@ -280,6 +319,7 @@ export default function MapPage() {
                             // Solo aplicar fallback si no está conectado y tenemos ubicación
                             const fallbackStatus = isDeviceConnectedFallback(asset.lastLocation);
                             if (fallbackStatus !== asset.isOnline) {
+                                hasChanges = true;
                                 return {
                                     ...asset,
                                     isOnline: fallbackStatus
@@ -288,10 +328,13 @@ export default function MapPage() {
                         }
                     }
                     return asset;
-                })
-            );
+                });
+                
+                // Solo actualizar el estado si realmente hay cambios
+                return hasChanges ? updatedAssets : prevAssets;
+            });
         }
-    }, [devicesConnectionMap, getDeviceState, isDeviceConnected]);
+    }, [devicesConnectionMap]); // Solo depender del mapa de conexiones
 
     // Función para manejar la selección limpia de assets
     const handleAssetSelection = useCallback((asset: AssetWithDevice) => {
@@ -410,8 +453,7 @@ export default function MapPage() {
             
             // Mantener las últimas 10 posiciones para el trazado en tiempo real
             const currentPoints = prevAsset.recentPoints || [];
-            // const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
-            const updatedPoints = [newGpsPoint, ...currentPoints];
+            const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
             
             return {
                 ...prevAsset,
@@ -429,8 +471,7 @@ export default function MapPage() {
             prevAssets.map(asset => {
                 if (asset.id === selectedAsset.id) {
                     const currentPoints = asset.recentPoints || [];
-                    // const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
-                    const updatedPoints = [newGpsPoint, ...currentPoints];
+                    const updatedPoints = [newGpsPoint, ...currentPoints].slice(0, 10);
                     
                     return {
                         ...asset,
@@ -447,8 +488,147 @@ export default function MapPage() {
             })
         );
         
-        console.log(`🗺️ Posición actualizada para ${selectedAsset.name}: ${newLatitude}, ${newLongitude} | Puntos: ${(selectedAsset.recentPoints?.length || 0) + 1}`);
-    }, [gpsData, selectedAsset?.id, selectedAsset?.deviceDetails?.imei]);
+        console.log(`🗺️ Posición actualizada para ${selectedAsset.name}: ${newLatitude}, ${newLongitude}`);
+    }, [gpsData?.deviceId, gpsData?.data, selectedAsset?.id, selectedAsset?.deviceDetails?.imei]);
+
+    // Función para convertir fecha y hora local a UTC
+    const convertToUTC = (dateStr: string, timeStr: string) => {
+        const localDateTime = new Date(`${dateStr}T${timeStr}:00`);
+        return localDateTime.toISOString();
+    };
+
+    // Función para cargar historial de un activo específico
+    const loadAssetHistory = async (asset: AssetWithDevice, filters: HistoryFilter) => {
+        if (!asset.deviceDetails?.imei) {
+            toast.error('No hay dispositivo asociado al activo');
+            return;
+        }
+
+        const assetId = asset.id;
+        setLoadingHistory(prev => new Set([...prev, assetId]));
+
+        try {
+            const fromDateTimeUTC = convertToUTC(filters.startDate, filters.startTime);
+            const toDateTimeUTC = convertToUTC(filters.endDate, filters.endTime);
+
+            console.log(`🔍 Cargando historial para ${asset.name} (${asset.deviceDetails.imei})`);
+            console.log('Rango de fechas:', { from: fromDateTimeUTC, to: toDateTimeUTC });
+
+            const history = await devicesService.getHistory({
+                deviceId: asset.deviceDetails.imei,
+                from: fromDateTimeUTC,
+                to: toDateTimeUTC,
+                page: 1,
+                limit: 500
+            });
+
+            // Ordenar por fecha descendente (más reciente primero)
+            history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+            // Actualizar el activo con los datos históricos
+            setAssets(prevAssets => 
+                prevAssets.map(prevAsset => 
+                    prevAsset.id === assetId 
+                        ? { ...prevAsset, historicalData: history }
+                        : prevAsset
+                )
+            );
+
+            // Si es el activo seleccionado, también actualizar el estado seleccionado
+            if (selectedAsset?.id === assetId) {
+                setSelectedAsset(prev => prev ? { ...prev, historicalData: history } : null);
+            }
+
+            toast.success(`Historial cargado para ${asset.name}`, {
+                description: `Se encontraron ${history.length} ubicaciones`
+            });
+
+            console.log(`✅ Historial cargado para ${asset.name}: ${history.length} puntos`);
+        } catch (error) {
+            console.error(`Error loading history for asset ${asset.name}:`, error);
+            toast.error(`Error al cargar historial de ${asset.name}`, {
+                description: 'No se pudo obtener el historial de ubicaciones'
+            });
+        } finally {
+            setLoadingHistory(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(assetId);
+                return newSet;
+            });
+        }
+    };
+
+    // Función para manejar el toggle del checkbox de historial
+    const handleHistoryToggle = (asset: AssetWithDevice, enabled: boolean) => {
+        const assetId = asset.id;
+        
+        if (enabled) {
+            // Habilitar historial
+            setAssetsWithHistoryEnabled(prev => new Set([...prev, assetId]));
+            
+            // Inicializar filtros con valores por defecto si no existen
+            if (!historyFilters[assetId]) {
+                const defaultFilters = getDefaultDateRange();
+                setHistoryFilters(prev => ({
+                    ...prev,
+                    [assetId]: defaultFilters
+                }));
+                
+                // Cargar historial inmediatamente con filtros por defecto
+                loadAssetHistory(asset, defaultFilters);
+            } else {
+                // Cargar historial con filtros existentes
+                loadAssetHistory(asset, historyFilters[assetId]);
+            }
+            
+            // Expandir controles automáticamente
+            setExpandedHistoryControls(prev => new Set([...prev, assetId]));
+        } else {
+            // Deshabilitar historial
+            setAssetsWithHistoryEnabled(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(assetId);
+                return newSet;
+            });
+            
+            // Limpiar datos históricos
+            setAssets(prevAssets => 
+                prevAssets.map(prevAsset => 
+                    prevAsset.id === assetId 
+                        ? { ...prevAsset, historicalData: undefined }
+                        : prevAsset
+                )
+            );
+            
+            // Si es el activo seleccionado, también limpiar el estado seleccionado
+            if (selectedAsset?.id === assetId) {
+                setSelectedAsset(prev => prev ? { ...prev, historicalData: undefined } : null);
+            }
+            
+            // Colapsar controles
+            setExpandedHistoryControls(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(assetId);
+                return newSet;
+            });
+        }
+    };
+
+    // Función para actualizar filtros de un activo
+    const updateHistoryFilters = (assetId: number, filters: Partial<HistoryFilter>) => {
+        setHistoryFilters(prev => ({
+            ...prev,
+            [assetId]: { ...prev[assetId], ...filters }
+        }));
+    };
+
+    // Función para aplicar filtros de historial
+    const applyHistoryFilters = (asset: AssetWithDevice) => {
+        const filters = historyFilters[asset.id];
+        if (!filters) return;
+        
+        loadAssetHistory(asset, filters);
+    };
 
     // El WebSocket se mantiene solo para el asset seleccionado para datos en tiempo real
     // El estado de conexión de la lista se basa en la última actividad de cada dispositivo
@@ -697,6 +877,127 @@ export default function MapPage() {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Sección de Historial */}
+                                        {asset.deviceDetails && (
+                                            <div className="mt-4 pt-4 border-t border-border">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id={`history-${asset.id}`}
+                                                            checked={assetsWithHistoryEnabled.has(asset.id)}
+                                                            onCheckedChange={(checked) => handleHistoryToggle(asset, !!checked)}
+                                                            className="border-[--theme-primary] data-[state=checked]:bg-[--theme-primary] data-[state=checked]:border-[--theme-primary]"
+                                                        />
+                                                        <label 
+                                                            htmlFor={`history-${asset.id}`}
+                                                            className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-1"
+                                                        >
+                                                            <History className="h-4 w-4 text-[--theme-primary]" />
+                                                            Ver historial
+                                                        </label>
+                                                    </div>
+                                                    
+                                                    {assetsWithHistoryEnabled.has(asset.id) && (
+                                                        <Collapsible 
+                                                            open={expandedHistoryControls.has(asset.id)}
+                                                            onOpenChange={(open) => {
+                                                                if (open) {
+                                                                    setExpandedHistoryControls(prev => new Set([...prev, asset.id]));
+                                                                } else {
+                                                                    setExpandedHistoryControls(prev => {
+                                                                        const newSet = new Set(prev);
+                                                                        newSet.delete(asset.id);
+                                                                        return newSet;
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <CollapsibleTrigger asChild>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm"
+                                                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-[--theme-primary]"
+                                                                >
+                                                                    {expandedHistoryControls.has(asset.id) ? 
+                                                                        <ChevronUp className="h-4 w-4" /> : 
+                                                                        <ChevronDown className="h-4 w-4" />
+                                                                    }
+                                                                </Button>
+                                                            </CollapsibleTrigger>
+                                                        </Collapsible>
+                                                    )}
+                                                </div>
+
+                                                {/* Controles de Filtrado */}
+                                                {assetsWithHistoryEnabled.has(asset.id) && (
+                                                    <Collapsible 
+                                                        open={expandedHistoryControls.has(asset.id)}
+                                                        onOpenChange={() => {}}
+                                                    >
+                                                        <CollapsibleContent className="space-y-3">
+                                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                                <div className="space-y-1">
+                                                                    <label className="text-xs font-medium text-muted-foreground">Fecha inicio</label>
+                                                                    <Input
+                                                                        type="date"
+                                                                        value={historyFilters[asset.id]?.startDate || ''}
+                                                                        onChange={(e) => updateHistoryFilters(asset.id, { startDate: e.target.value })}
+                                                                        className="h-8 text-xs border-border"
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <label className="text-xs font-medium text-muted-foreground">Hora inicio</label>
+                                                                    <Input
+                                                                        type="time"
+                                                                        value={historyFilters[asset.id]?.startTime || ''}
+                                                                        onChange={(e) => updateHistoryFilters(asset.id, { startTime: e.target.value })}
+                                                                        className="h-8 text-xs border-border"
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <label className="text-xs font-medium text-muted-foreground">Fecha fin</label>
+                                                                    <Input
+                                                                        type="date"
+                                                                        value={historyFilters[asset.id]?.endDate || ''}
+                                                                        onChange={(e) => updateHistoryFilters(asset.id, { endDate: e.target.value })}
+                                                                        className="h-8 text-xs border-border"
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <label className="text-xs font-medium text-muted-foreground">Hora fin</label>
+                                                                    <Input
+                                                                        type="time"
+                                                                        value={historyFilters[asset.id]?.endTime || ''}
+                                                                        onChange={(e) => updateHistoryFilters(asset.id, { endTime: e.target.value })}
+                                                                        className="h-8 text-xs border-border"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    onClick={() => applyHistoryFilters(asset)}
+                                                                    disabled={loadingHistory.has(asset.id)}
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90"
+                                                                >
+                                                                    <Filter className="h-3 w-3 mr-1" />
+                                                                    {loadingHistory.has(asset.id) ? 'Cargando...' : 'Filtrar'}
+                                                                </Button>
+                                                            </div>
+                                                            
+                                                            {/* Información del historial cargado */}
+                                                            {asset.historicalData && asset.historicalData.length > 0 && (
+                                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                                                    📊 {asset.historicalData.length} ubicaciones históricas cargadas
+                                                                </div>
+                                                            )}
+                                                        </CollapsibleContent>
+                                                    </Collapsible>
+                                                )}
+                                            </div>
+                                        )}
                                     </Card>
                                 ))}
                             </div>
@@ -725,8 +1026,12 @@ export default function MapPage() {
                         <RealtimeRouteMap
                             imei={selectedAsset.deviceDetails?.imei || ''}
                             theme={mode}
-                            // initialHistory={(selectedAsset.recentPoints || []).slice(0, 10)}
-                            initialHistory={(selectedAsset.recentPoints || [])}
+                            // Priorizar datos históricos si están disponibles, sino usar datos recientes
+                            initialHistory={
+                                assetsWithHistoryEnabled.has(selectedAsset.id) && selectedAsset.historicalData
+                                    ? selectedAsset.historicalData
+                                    : (selectedAsset.recentPoints || [])
+                            }
                             livePoint={gpsData?.data && selectedAsset.deviceDetails?.imei === gpsData.deviceId ? {
                                 id: Date.now(),
                                 deviceId: gpsData.deviceId,
@@ -739,6 +1044,10 @@ export default function MapPage() {
                             } : null}
                             isConnected={!!(gpsData?.data && selectedAsset.deviceDetails?.imei === gpsData.deviceId)}
                             className="w-full h-full"
+                            // Indicar si estamos mostrando datos históricos
+                            showingHistoricalData={assetsWithHistoryEnabled.has(selectedAsset.id) && !!selectedAsset.historicalData}
+                            // Limitar puntos solo cuando NO se muestra historial
+                            limitPoints={!assetsWithHistoryEnabled.has(selectedAsset.id)}
                         />
                     ) : (
                         <div className="w-full h-full bg-muted/30 flex items-center justify-center">
