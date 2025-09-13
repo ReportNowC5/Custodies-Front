@@ -10,6 +10,7 @@ const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), 
 const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
 const Polyline = dynamic(() => import('react-leaflet').then(m => m.Polyline), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const ZoomControl = dynamic(() => import('react-leaflet').then(m => m.ZoomControl), { ssr: false });
 // Nota: useMap se usará vía require dentro de un subcomponente para evitar SSR issues
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -160,12 +161,64 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
 
     return (
         <div className={`relative w-full h-full ${className}`}>
+            <style jsx global>{`
+        @keyframes markerDrop {
+          0% {
+            transform: translateY(-100px) scale(0.8);
+            opacity: 0;
+          }
+          50% {
+            transform: translateY(10px) scale(1.1);
+            opacity: 0.8;
+          }
+          100% {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+        }
+        
+        @keyframes markerShake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        .leaflet-container {
+          background: #1f2937 !important;
+        }
+        
+        .leaflet-popup-content-wrapper {
+          background: transparent !important;
+          box-shadow: none !important;
+          border-radius: 8px !important;
+        }
+        
+        .leaflet-popup-tip {
+          background: rgba(17, 24, 39, 0.95) !important;
+        }
+        
+        .leaflet-control-zoom {
+          border: none !important;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .leaflet-control-zoom a {
+          background: rgba(17, 24, 39, 0.9) !important;
+          color: white !important;
+          border: 1px solid rgba(75, 85, 99, 0.3) !important;
+        }
+        
+        .leaflet-control-zoom a:hover {
+          background: rgba(31, 41, 55, 0.9) !important;
+        }
+      `}</style>
             <MapContainer
                 center={[hasAnyCoords ? currentLat : 19.4326, hasAnyCoords ? currentLng : -99.1332]}
                 zoom={16}
-                zoomControl
+                zoomControl={false}
                 style={{ height: '100%', width: '100%' }}
             >
+                <ZoomControl position="bottomleft" />
                 <EventBinder />
                 <TileLayer
                     url={theme === 'dark'

@@ -6,7 +6,7 @@ import { BatteryIndicator } from '@/components/devices/battery-indicator';
 import { useDeviceWebSocket } from '@/hooks/use-device-websocket';
 import { useMapAnimations } from '@/hooks/use-map-animations';
 import { devicesService } from '@/lib/services/devices.service';
-import { DeviceResponse, DeviceStatusResponse } from '@/lib/types/device';
+import { DeviceResponse, DeviceStatusResponse, DeviceHistoryLocation } from '@/lib/types/device';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Phone, Hash, Calendar, Activity, Users, MapPin, Battery } from 'lucide-react';
@@ -135,6 +135,7 @@ export default function DeviceDetailPage() {
     const [lastConnection, setLastConnection] = useState<string | null>(null);
     const [lastPosition, setLastPosition] = useState<{timestamp: string, latitude: number, longitude: number} | null>(null);
     const [lastLocationUpdate, setLastLocationUpdate] = useState<string | null>(null);
+    const [positionHistory, setPositionHistory] = useState<DeviceHistoryLocation[]>([]);
     
     // Theme configuration
     const { theme, setTheme, resolvedTheme: mode } = useTheme();
@@ -235,13 +236,45 @@ export default function DeviceDetailPage() {
         if (validCoords) {
             setMapCoordinates(validCoords);
             setLastLocationUpdate(new Date().toISOString());
+            const newTimestamp = new Date().toISOString();
             setLastPosition({
-                timestamp: new Date().toISOString(),
+                timestamp: newTimestamp,
                 latitude: validCoords.latitude,
                 longitude: validCoords.longitude
             });
+            
+            // Extraer velocidad y course de los datos GPS
+            let parsedData = gpsData;
+            if (typeof gpsData === 'string') {
+                try {
+                    parsedData = JSON.parse(gpsData);
+                } catch (e) {
+                    parsedData = { data: {} };
+                }
+            }
+            
+            const speed = parsedData?.data?.speed || parsedData?.data?.velocidad || 0;
+            const course = parsedData?.data?.course || parsedData?.data?.rumbo || 0;
+            
+            // Crear nuevo punto de historial compatible con DeviceHistoryLocation
+            const newHistoryPoint: DeviceHistoryLocation = {
+                id: Date.now(),
+                deviceId: device?.imei || '',
+                latitude: validCoords.latitude,
+                longitude: validCoords.longitude,
+                timestamp: newTimestamp,
+                speed: speed,
+                course: course,
+                createdAt: newTimestamp
+            };
+            
+            // Actualizar historial de posiciones (mantener últimas 100 para mejor rendimiento)
+            setPositionHistory(prevHistory => {
+                const updatedHistory = [newHistoryPoint, ...prevHistory].slice(0, 100);
+                return updatedHistory;
+            });
         }
-    }, [gpsData]);
+    }, [gpsData, device?.imei]);
 
     // Función para obtener la última conexión usando lógica mixta
     const getEffectiveLastConnection = useCallback(() => {
@@ -327,6 +360,30 @@ export default function DeviceDetailPage() {
                         }
                         
                         console.log('📊 Estado consolidado del dispositivo cargado:', statusData);
+                        
+                        // Cargar historial inicial de ubicaciones
+                        try {
+                            const now = new Date();
+                            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Últimas 24 horas
+                            
+                            const historyData = await devicesService.getHistory({
+                                deviceId: deviceData.imei,
+                                from: yesterday.toISOString(),
+                                to: now.toISOString(),
+                                limit: 50 // Cargar últimas 50 ubicaciones
+                            });
+                            
+                            if (historyData && historyData.length > 0) {
+                                // Ordenar por timestamp descendente (más reciente primero)
+                                const sortedHistory = historyData.sort((a, b) => 
+                                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                                );
+                                setPositionHistory(sortedHistory);
+                                console.log(`📍 Cargadas ${sortedHistory.length} ubicaciones históricas iniciales`);
+                            }
+                        } catch (historyErr) {
+                            console.warn('⚠️ Error al cargar historial inicial:', historyErr);
+                        }
                     } catch (statusErr) {
                         console.warn('⚠️ Error al cargar estado consolidado, usando datos básicos:', statusErr);
                         // Continuar con datos básicos si el endpoint consolidado falla
@@ -421,6 +478,10 @@ export default function DeviceDetailPage() {
                         isConnected={isDeviceOnline}
                         lastLocationUpdate={lastPosition?.timestamp || deviceStatus?.data?.location?.timestamp || null}
                         theme={mode}
+                        historyLocations={positionHistory}
+                        showRoute={positionHistory.length > 1}
+                        routeColor="#10B981"
+                        routeWeight={3}
                     />
                 </div>
 

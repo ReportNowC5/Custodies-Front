@@ -1271,7 +1271,7 @@ interface DeviceMapProps {
 
 export const DeviceMap: React.FC<DeviceMapProps> = ({
     latitude = 19.4326,
-    longitude = -99.1332,
+    longitude = -100.1332,
     deviceName = 'Dispositivo',
     className = '',
     shouldFlyTo = false,
