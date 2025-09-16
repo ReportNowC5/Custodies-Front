@@ -15,7 +15,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 
   if (location === "/") {
     return (
-      <body className={cn("dash-tail-app ", inter.className)}>
+      <body className={cn("dash-tail-app ", inter.className)} suppressHydrationWarning={true}>
         <ThemeProvider
           attribute="class"
           enableSystem={false}

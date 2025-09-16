@@ -39,6 +39,23 @@ const nextConfig = {
             {
                 source: '/api/admin/:path*',
                 destination: 'http://localhost/api/admin/:path*',
+            },
+            // Proxy para GPS API externa - evita problemas de CORS
+            {
+                source: '/api/gps/:path*',
+                destination: 'https://gps.dxplus.org/api/:path*',
+            },
+            {
+                source: '/api/devices/:path*',
+                destination: 'https://gps.dxplus.org/api/devices/:path*',
+            },
+            {
+                source: '/api/users/:path*',
+                destination: 'https://gps.dxplus.org/api/users/:path*',
+            },
+            {
+                source: '/api/assets/:path*',
+                destination: 'https://gps.dxplus.org/api/assets/:path*',
             }
         ];
     },

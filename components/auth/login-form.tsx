@@ -172,7 +172,7 @@ const LoginForm = ({ className }: { className?: string }) => {
         <div className={cn("w-full max-w-md mx-auto font-satoshi", className)}>
             <div className="flex flex-col items-start justify-center text-left mb-8">
                 <div className="w-16 h-16 bg-[#846CF9] rounded-full flex items-center justify-center mb-4">
-                    <Image src="/images/logo/logo.png" alt="Logo" width={48} height={48} />
+                    <Image src="/images/logo/logo.png" alt="Logo" width={48} height={48} style={{ width: 'auto', height: 'auto' }} />
                 </div>
                 <h1 className="text-2xl font-bold text-[#333333] mb-2">Bienvenido de vuelta</h1>
                 <p className="text-[#5C5C5C]">Ingresa tus credenciales para iniciar sesión</p>

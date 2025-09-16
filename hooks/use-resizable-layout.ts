@@ -148,12 +148,13 @@ export const useResizableLayout = (): UseResizableLayoutReturn => {
     return () => {
       // Cleanup en caso de unmount durante resize
       document.body.classList.remove('resizing');
+      // Remover todos los event listeners posibles sin depender de las funciones específicas
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+  }, []); // Dependencias vacías para evitar bucle infinito
 
   return {
     panelWidth,

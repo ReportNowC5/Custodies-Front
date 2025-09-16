@@ -406,14 +406,14 @@ export const useMultipleDevicesWebSocket = ({ imeis, enabled = true }: UseMultip
                 clearTimeout(timeoutRef.current);
             }
         };
-    }, [imeis, enabled, connect, disconnect]);
+    }, [imeis, enabled]); // Dependencias específicas para evitar bucle infinito
 
     // Cleanup al desmontar el componente
     useEffect(() => {
         return () => {
             disconnect();
         };
-    }, [disconnect]);
+    }, []); // Dependencias vacías para evitar bucle infinito
 
     return {
         ...state,

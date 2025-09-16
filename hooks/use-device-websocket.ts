@@ -341,14 +341,14 @@ export const useDeviceWebSocket = ({ imei, enabled = true }: UseDeviceWebSocketP
                 clearTimeout(timeoutRef.current);
             }
         };
-    }, [imei, enabled, connect, disconnect]);
+    }, [imei, enabled]); // Dependencias específicas para evitar bucle infinito
 
     // Cleanup al desmontar el componente
     useEffect(() => {
         return () => {
             disconnect();
         };
-    }, [disconnect]);
+    }, []); // Dependencias vacías para evitar bucle infinito
 
     return {
         ...state,

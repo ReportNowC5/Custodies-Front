@@ -28,12 +28,14 @@ class Environment {
         console.log('NEXT_PUBLIC_API_BASE_URL:', process.env.NEXT_PUBLIC_API_BASE_URL);
         console.log('NEXT_PUBLIC_ENV:', process.env.NEXT_PUBLIC_ENV);
         
+        const isDev = process.env.NEXT_PUBLIC_ENV === 'development';
+        
         this.config = {
             api: {
-                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://gps.dxplus.org/'
+                API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || (isDev ? 'http://localhost:3000' : 'https://gps.dxplus.org/')
             },
             backend: {
-                BACKEND_SERVICE_URL: process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || 'https://gps.dxplus.org/'
+                BACKEND_SERVICE_URL: process.env.NEXT_PUBLIC_BACKEND_SERVICE_URL || (isDev ? 'http://localhost:3000' : 'https://gps.dxplus.org/')
             },
             site: {
                 SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'

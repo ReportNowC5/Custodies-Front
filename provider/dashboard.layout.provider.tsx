@@ -23,6 +23,7 @@ const DashBoardLayoutProvider = ({ children, trans }: { children: React.ReactNod
   if (!mounted) {
     return <LayoutLoader />;
   }
+  
   if (layout === "semibox") {
     return (
       <>

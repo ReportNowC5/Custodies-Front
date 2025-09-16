@@ -46,15 +46,32 @@ class ApiClient {
             (error) => Promise.reject(error)
         );
     
-        // Response interceptor - Mejorado con evento personalizado
+        // Response interceptor - Mejorado con manejo de errores y fallbacks
         this.client.interceptors.response.use(
             (response: AxiosResponse) => {
                 return response;
             },
             (error: AxiosError) => {
-                console.error('💥 Error en respuesta:', error.response?.status, error.config);
+                console.error('💥 Error en respuesta:', error.response?.status, error.config?.url);
                 
-                if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+                // Manejar errores de red/conexión
+                if (!error.response) {
+                    console.warn('🌐 Error de conexión - usando datos mock');
+                    // No rechazar el error, permitir que el servicio maneje el fallback
+                    return Promise.reject({
+                        ...error,
+                        isNetworkError: true,
+                        message: 'Error de conexión - usando datos de respaldo'
+                    });
+                }
+                
+                // Manejar errores 401 para autenticación
+                if (error.response?.status === 401) {
+                    if (error.config?.url?.includes('/auth/login')) {
+                        // Error de login - no redirigir
+                        return Promise.reject(error);
+                    }
+                    
                     console.log('🚫 Token caducado o inválido');
                     
                     // Limpiar tokens y estado
@@ -79,6 +96,17 @@ class ApiClient {
                         }, 100);
                     }
                 }
+                
+                // Manejar errores de CORS
+                if (error.code === 'ERR_NETWORK' || error.message?.includes('CORS')) {
+                    console.warn('🚫 Error de CORS detectado');
+                    return Promise.reject({
+                        ...error,
+                        isCorsError: true,
+                        message: 'Error de CORS - verificar configuración del proxy'
+                    });
+                }
+                
                 return Promise.reject(error);
             }
         );

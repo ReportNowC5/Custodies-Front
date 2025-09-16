@@ -14,33 +14,50 @@ import {
 } from "@/components/ui/popover";
 import { useTheme } from "next-themes";
 
-export default function DatePickerWithRange({ className }: { className?: string }) {
-  const [date, setDate] = React.useState<any | null>(null);
+interface DatePickerWithRangeProps {
+  className?: string;
+  onDateChange?: (date: any) => void;
+  defaultValue?: any;
+}
+
+const DatePickerWithRange = React.memo(({ className, onDateChange, defaultValue }: DatePickerWithRangeProps) => {
+  const [date, setDate] = React.useState<any | null>(defaultValue || null);
   const { theme: mode } = useTheme();
 
+  // Memoizar el handler de cambio de fecha para evitar re-renders
+  const handleDateChange = React.useCallback((newDate: any) => {
+    setDate(newDate);
+    onDateChange?.(newDate);
+  }, [onDateChange]);
+
+  // Memoizar el texto del botón para evitar re-renders innecesarios
+  const buttonText = React.useMemo(() => {
+    if (date?.from) {
+      if (date.to) {
+        return `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`;
+      }
+      return format(date.from, "LLL dd, y");
+    }
+    return "Pick a date";
+  }, [date]);
+
+  // Memoizar las clases del botón
+  const buttonClasses = React.useMemo(() => {
+    return cn(" font-normal", {
+      " bg-white text-default-600": mode !== "dark",
+    });
+  }, [mode]);
+
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("grid gap-2", className)} key="date-picker-wrapper">
       <Popover>
         <PopoverTrigger asChild>
           <Button
             color={mode === "dark" ? "secondary" : "default"}
-            className={cn(" font-normal", {
-              " bg-white text-default-600": mode !== "dark",
-            })}
+            className={buttonClasses}
           >
             <CalendarIcon className="ltr:mr-2 rtl:ml-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
-                </>
-              ) : (
-                format(date.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Pick a date</span>
-            )}
+            <span>{buttonText}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
@@ -49,11 +66,15 @@ export default function DatePickerWithRange({ className }: { className?: string 
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={setDate}
+            onSelect={handleDateChange}
             numberOfMonths={2}
           />
         </PopoverContent>
       </Popover>
     </div>
   );
-}
+});
+
+DatePickerWithRange.displayName = "DatePickerWithRange";
+
+export default DatePickerWithRange;
