@@ -51,7 +51,8 @@ import {
     History,
     Filter,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Award
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from "next-themes";
@@ -123,7 +124,7 @@ const getDefaultDateRange = () => {
     return {
         startDate: yesterday.toISOString().split('T')[0],
         startTime: '00:00',
-        endDate: now.toISOString().split('T')[0],
+        endDate: yesterday.toISOString().split('T')[0],
         endTime: '23:59'
     };
 };
@@ -140,6 +141,38 @@ const isDeviceConnectedFallback = (lastLocation?: { timestamp: string }) => {
     return diffInMinutes <= 5;
 };
 
+// Función para calcular la distancia entre dos puntos GPS (fórmula de Haversine)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radio de la Tierra en kilómetros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distancia en kilómetros
+};
+
+// Función para calcular la distancia total recorrida basada en puntos del historial
+const calculateTotalDistance = (points: DeviceHistoryLocation[]): number => {
+    if (points.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 1; i < points.length; i++) {
+        const prevPoint = points[i-1];
+        const currentPoint = points[i];
+        totalDistance += calculateDistance(
+            prevPoint.latitude,
+            prevPoint.longitude,
+            currentPoint.latitude,
+            currentPoint.longitude
+        );
+    }
+    
+    return totalDistance;
+};
+
 export default function MapPage() {
     const router = useRouter();
     const [assets, setAssets] = useState<AssetWithDevice[]>([]);
@@ -152,6 +185,15 @@ export default function MapPage() {
     const [historyFilters, setHistoryFilters] = useState<Record<number, HistoryFilter>>({});
     const [loadingHistory, setLoadingHistory] = useState<Set<number>>(new Set());
     const [expandedHistoryControls, setExpandedHistoryControls] = useState<Set<number>>(new Set());
+    
+    // Estado para el manejo de vistas
+    const [showAssetDetails, setShowAssetDetails] = useState(false);
+    
+    // Estado para manejar el punto seleccionado del historial
+    const [selectedHistoryPoint, setSelectedHistoryPoint] = useState<DeviceHistoryLocation | null>(null);
+    
+    // Referencia al componente del mapa para controlar la vista
+    const [mapRef, setMapRef] = useState<any>(null);
 
     // Theme configuration
     const { theme, setTheme, resolvedTheme: mode } = useTheme();
@@ -229,7 +271,7 @@ export default function MapPage() {
                                             deviceId: deviceDetails.imei,
                                             from: veryOldDate,
                                             to: now,
-                                            limit: 10 // Solo 5 para carga inicial
+                                            limit: 999999
                                         });
 
                                         // Ordenar por timestamp descendente (más reciente primero) y tomar las últimas 20
@@ -265,12 +307,6 @@ export default function MapPage() {
                 );
 
                 setAssets(enrichedAssets);
-
-                // Seleccionar el primer activo con dispositivo por defecto
-                const firstAssetWithDevice = enrichedAssets.find(a => a.deviceDetails);
-                if (firstAssetWithDevice) {
-                    setSelectedAsset(firstAssetWithDevice);
-                }
 
             } catch (err) {
                 console.error('Error fetching assets:', err);
@@ -383,8 +419,32 @@ export default function MapPage() {
         // Seleccionar el nuevo asset (esto activará el WebSocket para el nuevo IMEI)
         setSelectedAsset(asset);
         
+        // Cambiar a la vista de detalles del dispositivo
+        setShowAssetDetails(true);
+        
         console.log(`✅ Asset ${asset.name} seleccionado exitosamente`);
     }, [selectedAsset]);
+
+    // Función para volver al listado de activos
+    const handleBackToAssetList = useCallback(() => {
+        setShowAssetDetails(false);
+        // Mantener el asset seleccionado para el mapa pero mostrar la vista de listado
+    }, []);
+    
+    // Función para manejar clic en elemento del historial
+    const handleHistoryPointClick = useCallback((point: DeviceHistoryLocation) => {
+        // Validar coordenadas antes de proceder
+        if (typeof point.latitude !== 'number' || typeof point.longitude !== 'number' ||
+            isNaN(point.latitude) || isNaN(point.longitude) ||
+            point.latitude < -90 || point.latitude > 90 ||
+            point.longitude < -180 || point.longitude > 180) {
+            console.warn('⚠️ Coordenadas inválidas en punto del historial:', point);
+            return;
+        }
+        
+        setSelectedHistoryPoint(point);
+        console.log(`📍 Centrando mapa en punto del historial: ${point.latitude}, ${point.longitude}`);
+    }, []);
 
     // Efecto para limpiar datos del WebSocket cuando cambia el asset seleccionado
     useEffect(() => {
@@ -519,7 +579,7 @@ export default function MapPage() {
                 from: fromDateTimeUTC,
                 to: toDateTimeUTC,
                 page: 1,
-                limit: 500
+                limit: 999999
             });
 
             // Ordenar por fecha descendente (más reciente primero)
@@ -627,6 +687,43 @@ export default function MapPage() {
         const filters = historyFilters[asset.id];
         if (!filters) return;
         
+        // Validación: Solo permitir filtrar por un día completo
+        //if (filters.startDate !== filters.endDate) {
+        //    toast.error('Error de filtrado', {
+        //        description: 'Solo se permite filtrar por un día completo. Selecciona la misma fecha para inicio y fin.'
+        //    });
+        //    return;
+        //}
+        
+        // Validación: Bloquear fechas futuras
+        const today = new Date().toISOString().split('T')[0];
+        if (filters.startDate > today) {
+            toast.error('Fecha inválida', {
+                description: 'No se pueden seleccionar fechas futuras.'
+            });
+            return;
+        }
+        
+        // Validación: Verificar que la hora de inicio sea anterior a la hora de fin
+        const startDateTime = new Date(`${filters.startDate}T${filters.startTime}:00`);
+        const endDateTime = new Date(`${filters.endDate}T${filters.endTime}:00`);
+        
+        if (startDateTime >= endDateTime) {
+            toast.error('Horario inválido', {
+                description: 'La hora de inicio debe ser anterior a la hora de fin.'
+            });
+            return;
+        }
+        
+        // Validación: Limitar el rango máximo a 24 horas
+        const timeDiffHours = (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+        if (timeDiffHours > 24) {
+            toast.error('Rango de tiempo excedido', {
+                description: 'El rango de filtrado no puede exceder las 24 horas.'
+            });
+            return;
+        }
+        
         loadAssetHistory(asset, filters);
     };
 
@@ -682,7 +779,9 @@ export default function MapPage() {
                 <div className="flex items-center gap-3">
                     <Button
                         onClick={() => {
-                            if (selectedAsset?.deviceDetails?.id) {
+                            if (showAssetDetails) {
+                                handleBackToAssetList();
+                            } else if (selectedAsset?.deviceDetails?.id) {
                                 router.push(`/devices/${selectedAsset.deviceDetails.id}`);
                             } else {
                                 router.back();
@@ -693,7 +792,7 @@ export default function MapPage() {
                         className="text-muted-foreground hover:text-[--theme-primary] hover:bg-[--theme-primary]/10"
                     >
                         <ArrowLeft className="h-4 w-4 mr-1" />
-                        Mapa en Tiempo Real
+                        {showAssetDetails ? 'Volver al listado de activos' : 'Mapa en Tiempo Real'}
                     </Button>
                 </div>
             </div>
@@ -708,12 +807,15 @@ export default function MapPage() {
                     }}
                 >
                     <div className="p-4 lg:p-6 h-full flex flex-col">
-                        <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-                            <Navigation className="h-5 w-5 text-[--theme-primary]" />
-                            Activos en Tiempo Real
-                        </h3>
+                        {!showAssetDetails ? (
+                            // Vista de listado de activos
+                            <>
+                                <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+                                    <Navigation className="h-5 w-5 text-[--theme-primary]" />
+                                    Activos en Tiempo Real
+                                </h3>
 
-                        <div className="flex-1 overflow-y-auto scrollbar-hide">
+                                <div className="flex-1 overflow-y-auto scrollbar-hide">
                             <div className="space-y-3">
                                 {assets.map((asset) => (
                                     <Card
@@ -762,246 +864,311 @@ export default function MapPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                        {/* Información básica simplificada */}
+                                        <div className="text-sm">
                                             {asset.deviceDetails ? (
-                                                <>
-                                                    {/* Columna Izquierda */}
-                                                    <div className="space-y-2">
-                                                        {/* No. telefónico */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Phone className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">No. telefónico</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    {asset.deviceDetails.client?.user?.phone || 'N/A'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* IMEI */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Hash className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">IMEI</div>
-                                                                <div className="text-xs font-medium text-foreground font-mono truncate">
-                                                                    {asset.deviceDetails.imei}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Creado */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Calendar className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Creado</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    {formatDate(asset.deviceDetails.createdAt)}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Última conexión GPS */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Activity className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Última conexión GPS</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    {asset.lastLocation?.timestamp ? formatDate(asset.lastLocation.timestamp) : 'Sin conexión'}
-                                                                </div>
-                                                                <div className="text-xs text-gray-500 mt-1">
-                                                                    💾 Datos de base de datos
-                                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                                        <Hash className="h-4 w-4 flex-shrink-0" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-xs text-muted-foreground">IMEI</div>
+                                                            <div className="text-xs font-medium text-foreground font-mono truncate">
+                                                                {asset.deviceDetails.imei}
                                                             </div>
                                                         </div>
                                                     </div>
-
-                                                    {/* Columna Derecha */}
-                                                    <div className="space-y-2">
-                                                        {/* Última posición recibida */}
-                                                        {asset.lastLocation && (
-                                                            <div className="flex items-center gap-2 text-muted-foreground">
-                                                                <MapPin className="h-4 w-4 flex-shrink-0" />
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="text-xs text-muted-foreground">Última posición recibida</div>
-                                                                    <div className="text-xs font-medium text-foreground truncate">
-                                                                        {formatDate(asset.lastLocation.timestamp)}
-                                                                    </div>
-                                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                                        {asset.lastLocation.latitude.toFixed(6)}, {asset.lastLocation.longitude.toFixed(6)}
-                                                                        {asset.recentPoints && asset.recentPoints.length > 0 && asset.recentPoints[0].speed && (
-                                                                            <span className="ml-2">• {asset.recentPoints[0].speed.toFixed(1)} km/h</span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Activo relacionado */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Truck className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Activo relacionado</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    {asset.name}
-                                                                </div>
+                                                    {asset.lastLocation && (
+                                                        <div className="text-right">
+                                                            <div className="text-xs text-muted-foreground">Última ubicación</div>
+                                                            <div className="text-xs font-medium text-foreground">
+                                                                {formatDate(asset.lastLocation.timestamp)}
                                                             </div>
                                                         </div>
-
-                                                        {/* Cliente */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Users className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Cliente</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    {asset.deviceDetails.client?.user?.name || 'Report Now'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Carga del dispositivo */}
-                                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                                            <Battery className="h-4 w-4 flex-shrink-0" />
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-xs text-muted-foreground">Carga del dispositivo</div>
-                                                                <div className="text-xs font-medium text-foreground truncate">
-                                                                    Sin datos
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </>
+                                                    )}
+                                                </div>
                                             ) : (
-                                                <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
+                                                <div className="flex items-center gap-2 text-muted-foreground">
                                                     <WifiOff className="h-4 w-4" />
                                                     <span className="text-xs">Sin dispositivo GPS</span>
                                                 </div>
                                             )}
                                         </div>
-
-                                        {/* Sección de Historial */}
-                                        {asset.deviceDetails && (
-                                            <div className="mt-4 pt-4 border-t border-border">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            id={`history-${asset.id}`}
-                                                            checked={assetsWithHistoryEnabled.has(asset.id)}
-                                                            onCheckedChange={(checked) => handleHistoryToggle(asset, !!checked)}
-                                                            className="border-[--theme-primary] data-[state=checked]:bg-[--theme-primary] data-[state=checked]:border-[--theme-primary]"
-                                                        />
-                                                        <label 
-                                                            htmlFor={`history-${asset.id}`}
-                                                            className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-1"
-                                                        >
-                                                            <History className="h-4 w-4 text-[--theme-primary]" />
-                                                            Ver historial
-                                                        </label>
-                                                    </div>
-                                                    
-                                                    {assetsWithHistoryEnabled.has(asset.id) && (
-                                                        <Collapsible 
-                                                            open={expandedHistoryControls.has(asset.id)}
-                                                            onOpenChange={(open) => {
-                                                                if (open) {
-                                                                    setExpandedHistoryControls(prev => new Set([...prev, asset.id]));
-                                                                } else {
-                                                                    setExpandedHistoryControls(prev => {
-                                                                        const newSet = new Set(prev);
-                                                                        newSet.delete(asset.id);
-                                                                        return newSet;
-                                                                    });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <CollapsibleTrigger asChild>
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="sm"
-                                                                    className="h-6 w-6 p-0 text-muted-foreground hover:text-[--theme-primary]"
-                                                                >
-                                                                    {expandedHistoryControls.has(asset.id) ? 
-                                                                        <ChevronUp className="h-4 w-4" /> : 
-                                                                        <ChevronDown className="h-4 w-4" />
-                                                                    }
-                                                                </Button>
-                                                            </CollapsibleTrigger>
-                                                        </Collapsible>
-                                                    )}
-                                                </div>
-
-                                                {/* Controles de Filtrado */}
-                                                {assetsWithHistoryEnabled.has(asset.id) && (
-                                                    <Collapsible 
-                                                        open={expandedHistoryControls.has(asset.id)}
-                                                        onOpenChange={() => {}}
-                                                    >
-                                                        <CollapsibleContent className="space-y-3">
-                                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                <div className="space-y-1">
-                                                                    <label className="text-xs font-medium text-muted-foreground">Fecha inicio</label>
-                                                                    <Input
-                                                                        type="date"
-                                                                        value={historyFilters[asset.id]?.startDate || ''}
-                                                                        onChange={(e) => updateHistoryFilters(asset.id, { startDate: e.target.value })}
-                                                                        className="h-8 text-xs border-border"
-                                                                    />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-xs font-medium text-muted-foreground">Hora inicio</label>
-                                                                    <Input
-                                                                        type="time"
-                                                                        value={historyFilters[asset.id]?.startTime || ''}
-                                                                        onChange={(e) => updateHistoryFilters(asset.id, { startTime: e.target.value })}
-                                                                        className="h-8 text-xs border-border"
-                                                                    />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-xs font-medium text-muted-foreground">Fecha fin</label>
-                                                                    <Input
-                                                                        type="date"
-                                                                        value={historyFilters[asset.id]?.endDate || ''}
-                                                                        onChange={(e) => updateHistoryFilters(asset.id, { endDate: e.target.value })}
-                                                                        className="h-8 text-xs border-border"
-                                                                    />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className="text-xs font-medium text-muted-foreground">Hora fin</label>
-                                                                    <Input
-                                                                        type="time"
-                                                                        value={historyFilters[asset.id]?.endTime || ''}
-                                                                        onChange={(e) => updateHistoryFilters(asset.id, { endTime: e.target.value })}
-                                                                        className="h-8 text-xs border-border"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div className="flex gap-2">
-                                                                <Button
-                                                                    onClick={() => applyHistoryFilters(asset)}
-                                                                    disabled={loadingHistory.has(asset.id)}
-                                                                    size="sm"
-                                                                    className="flex-1 h-8 text-xs bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90"
-                                                                >
-                                                                    <Filter className="h-3 w-3 mr-1" />
-                                                                    {loadingHistory.has(asset.id) ? 'Cargando...' : 'Filtrar'}
-                                                                </Button>
-                                                            </div>
-                                                            
-                                                            {/* Información del historial cargado */}
-                                                            {asset.historicalData && asset.historicalData.length > 0 && (
-                                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                                    📊 {asset.historicalData.length} ubicaciones históricas cargadas
-                                                                </div>
-                                                            )}
-                                                        </CollapsibleContent>
-                                                    </Collapsible>
-                                                )}
-                                            </div>
-                                        )}
                                     </Card>
                                 ))}
                             </div>
-                        </div>
+                                </div>
+                            </>
+                        ) : (
+                            // Vista de detalles del dispositivo
+                            selectedAsset && (
+                                <>
+                                    <div className="mb-4">
+                                        <h3 className="text-xl font-bold text-foreground mb-2 flex items-center gap-2">
+                                            <Smartphone className="h-5 w-5 text-[--theme-primary]" />
+                                            Información del Dispositivo
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">{selectedAsset.name}</p>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4">
+                                        {/* Información completa del activo */}
+                                        <Card className="p-4">
+                                            <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                                <Truck className="h-4 w-4 text-[--theme-primary]" />
+                                                Información del Activo
+                                            </h4>
+                                            <div className="grid grid-cols-1 gap-3 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <Truck className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Nombre del activo</div>
+                                                        <div className="font-medium text-foreground">{selectedAsset.name}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Activity className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Tipo de activo</div>
+                                                        <div className="text-foreground">{getAssetTypeLabel(selectedAsset.assetType)}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Award className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Estado del activo</div>
+                                                        <div className="text-foreground">{getStatusLabel(selectedAsset.status)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Card>
+
+                                        {/* Información del dispositivo GPS */}
+                                        <Card className="p-4">
+                                            <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                                <Smartphone className="h-4 w-4 text-[--theme-primary]" />
+                                                Dispositivo GPS
+                                            </h4>
+                                            <div className="grid grid-cols-1 gap-3 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <Hash className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">IMEI</div>
+                                                        <div className="font-mono text-foreground">{selectedAsset.deviceDetails?.imei}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">No. telefónico</div>
+                                                        <div className="text-foreground">{selectedAsset.deviceDetails?.client?.user?.phone || 'N/A'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Cliente</div>
+                                                        <div className="text-foreground">{selectedAsset.deviceDetails?.client?.user?.name || 'Report Now'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Fecha de creación</div>
+                                                        <div className="text-foreground">{selectedAsset.deviceDetails?.createdAt ? formatDate(selectedAsset.deviceDetails.createdAt) : 'N/A'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Activity className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Última conexión GPS</div>
+                                                        <div className="text-foreground">
+                                                            {selectedAsset.lastLocation?.timestamp ? formatDate(selectedAsset.lastLocation.timestamp) : 'Sin conexión'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-1">
+                                                            💾 Datos de base de datos
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {selectedAsset.lastLocation && (
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                                        <div>
+                                                            <div className="text-xs text-muted-foreground">Última posición recibida</div>
+                                                            <div className="text-foreground">
+                                                                {formatDate(selectedAsset.lastLocation.timestamp)}
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground mt-1">
+                                                                {selectedAsset.lastLocation.latitude.toFixed(6)}, {selectedAsset.lastLocation.longitude.toFixed(6)}
+                                                                {selectedAsset.recentPoints && selectedAsset.recentPoints.length > 0 && selectedAsset.recentPoints[0].speed && (
+                                                                    <span className="ml-2">• {selectedAsset.recentPoints[0].speed.toFixed(1)} km/h</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-2">
+                                                    {selectedAsset.isOnline ? (
+                                                        <Wifi className="h-4 w-4 text-green-500" />
+                                                    ) : (
+                                                        <WifiOff className="h-4 w-4 text-red-500" />
+                                                    )}
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Estado de conexión</div>
+                                                        <div className={`font-medium ${
+                                                            selectedAsset.isOnline ? 'text-green-600' : 'text-red-600'
+                                                        }`}>
+                                                            {selectedAsset.isOnline ? 'Conectado' : 'Desconectado'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Battery className="h-4 w-4 text-muted-foreground" />
+                                                    <div>
+                                                        <div className="text-xs text-muted-foreground">Carga del dispositivo</div>
+                                                        <div className="text-foreground">Sin datos</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Card>
+
+                                        {/* Historial completo del activo */}
+                                        <Card className="p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                                    <History className="h-4 w-4 text-[--theme-primary]" />
+                                                    Historial Completo
+                                                </h4>
+                                                <div className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={`full-history-${selectedAsset.id}`}
+                                                        checked={assetsWithHistoryEnabled.has(selectedAsset.id)}
+                                                        onCheckedChange={(checked) => handleHistoryToggle(selectedAsset, !!checked)}
+                                                        className="border-[--theme-primary] data-[state=checked]:bg-[--theme-primary] data-[state=checked]:border-[--theme-primary]"
+                                                    />
+                                                    <label 
+                                                        htmlFor={`full-history-${selectedAsset.id}`}
+                                                        className="text-sm font-medium text-foreground cursor-pointer"
+                                                    >
+                                                        Mostrar historial
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {/* Controles de filtrado mejorados */}
+                                            {assetsWithHistoryEnabled.has(selectedAsset.id) && (
+                                                <div className="space-y-3 mb-4">
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div className="space-y-1">
+                                                            <label className="text-xs font-medium text-muted-foreground">Fecha</label>
+                                                            <Input
+                                                                type="date"
+                                                                value={historyFilters[selectedAsset.id]?.startDate || ''}
+                                                                onChange={(e) => {
+                                                                    const selectedDate = e.target.value;
+                                                                    // Sincronización automática: startDate y endDate siempre iguales
+                                                                    updateHistoryFilters(selectedAsset.id, { 
+                                                                        startDate: selectedDate,
+                                                                        endDate: selectedDate // Automáticamente sincronizar endDate
+                                                                    });
+                                                                }}
+                                                                max={new Date().toISOString().split('T')[0]}
+                                                                className="h-8 text-xs border-border"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-xs font-medium text-muted-foreground">Hora inicio</label>
+                                                            <Input
+                                                                type="time"
+                                                                value={historyFilters[selectedAsset.id]?.startTime || '00:00'}
+                                                                onChange={(e) => updateHistoryFilters(selectedAsset.id, { startTime: e.target.value })}
+                                                                className="h-8 text-xs border-border"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-xs font-medium text-muted-foreground">Hora fin</label>
+                                                            <Input
+                                                                type="time"
+                                                                value={historyFilters[selectedAsset.id]?.endTime || '23:59'}
+                                                                onChange={(e) => updateHistoryFilters(selectedAsset.id, { endTime: e.target.value })}
+                                                                className="h-8 text-xs border-border"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-xs font-medium text-muted-foreground">Acción</label>
+                                                            <Button
+                                                                onClick={() => applyHistoryFilters(selectedAsset)}
+                                                                disabled={loadingHistory.has(selectedAsset.id)}
+                                                                size="sm"
+                                                                className="h-8 text-xs bg-[--theme-primary] text-primary-foreground hover:bg-[--theme-primary]/90 w-full"
+                                                            >
+                                                                <Filter className="h-3 w-3 mr-1" />
+                                                                {loadingHistory.has(selectedAsset.id) ? 'Cargando...' : 'Filtrar'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Información del historial cargado y distancia total */}
+                                                    {selectedAsset.historicalData && selectedAsset.historicalData.length > 0 && (
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                                                📊 {selectedAsset.historicalData.length} ubicaciones cargadas
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border border-blue-200">
+                                                                🛣️ Distancia: {calculateTotalDistance(selectedAsset.historicalData).toFixed(2)} km
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Mostrar distancia 0 cuando no hay historial filtrado */}
+                                                    {assetsWithHistoryEnabled.has(selectedAsset.id) && (!selectedAsset.historicalData || selectedAsset.historicalData.length === 0) && (
+                                                        <div className="text-xs text-muted-foreground bg-blue-50 p-2 rounded border border-blue-200">
+                                                            🛣️ Distancia total recorrida: 0.00 km
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Lista de ubicaciones recientes con funcionalidad de clic */}
+                                            {assetsWithHistoryEnabled.has(selectedAsset.id) && (
+                                                <ScrollArea className="h-64">
+                                                    <div className="space-y-2">
+                                                        {(selectedAsset.historicalData || selectedAsset.recentPoints || []).map((point, index) => (
+                                                            <div 
+                                                                key={point.id || index} 
+                                                                className="flex items-center gap-3 p-2 bg-muted/30 rounded text-xs cursor-pointer hover:bg-muted/50 transition-colors"
+                                                                onClick={() => handleHistoryPointClick(point)}
+                                                                title="Haz clic para centrar el mapa en esta ubicación"
+                                                            >
+                                                                <MapPin className="h-3 w-3 text-[--theme-primary] flex-shrink-0" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="font-medium text-foreground">
+                                                                        {formatDate(point.timestamp)}
+                                                                    </div>
+                                                                    <div className="text-muted-foreground truncate">
+                                                                        {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}
+                                                                    </div>
+                                                                    {point.speed && (
+                                                                        <div className="text-muted-foreground">
+                                                                            Velocidad: {point.speed.toFixed(1)} km/h
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <Navigation className="h-3 w-3 text-muted-foreground opacity-50" />
+                                                            </div>
+                                                        ))}
+                                                        {(!selectedAsset.recentPoints || selectedAsset.recentPoints.length === 0) && (
+                                                            <div className="text-center text-muted-foreground py-4">
+                                                                No hay datos de ubicación disponibles
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </ScrollArea>
+                                            )}
+                                        </Card>
+                                    </div>
+                                </>
+                            )
+                        )}
                     </div>
                 </div>
 
@@ -1024,6 +1191,7 @@ export default function MapPage() {
                 >
                     {selectedAsset ? (
                         <RealtimeRouteMap
+                            ref={setMapRef}
                             imei={selectedAsset.deviceDetails?.imei || ''}
                             theme={mode}
                             // Priorizar datos históricos si están disponibles, sino usar datos recientes
@@ -1048,12 +1216,16 @@ export default function MapPage() {
                             showingHistoricalData={assetsWithHistoryEnabled.has(selectedAsset.id) && !!selectedAsset.historicalData}
                             // Limitar puntos solo cuando NO se muestra historial
                             limitPoints={!assetsWithHistoryEnabled.has(selectedAsset.id)}
+                            // Punto seleccionado del historial
+                            selectedHistoryPoint={selectedHistoryPoint}
                         />
                     ) : (
                         <div className="w-full h-full bg-muted/30 flex items-center justify-center">
                             <div className="text-center max-w-md px-4">
                                 <MapPin className="h-8 w-8 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-4 text-muted-foreground" />
-                                <p className="text-sm lg:text-base text-muted-foreground font-medium">Selecciona un activo</p>
+                                <h3 className="text-lg font-semibold text-muted-foreground mb-2">
+                                    Selecciona un activo para visualizar
+                                </h3>
                                 <p className="text-xs lg:text-sm text-muted-foreground/70 mt-1">Elige un activo de la lista para ver su ubicación en tiempo real</p>
                             </div>
                         </div>

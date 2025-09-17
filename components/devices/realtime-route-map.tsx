@@ -29,24 +29,53 @@ export interface RealtimeRouteMapProps {
     className?: string;
     showingHistoricalData?: boolean; // indica si se están mostrando datos históricos
     limitPoints?: boolean; // si debe limitar a 10 puntos o mostrar todos
+    selectedHistoryPoint?: DeviceHistoryLocation | null; // punto seleccionado del historial
 }
 
-export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
-    imei,
+export const RealtimeRouteMap = React.forwardRef<L.Map | null, RealtimeRouteMapProps>(({    imei,
     theme = 'dark',
     initialHistory,
     livePoint,
     isConnected,
     className = '',
     showingHistoricalData = false,
-    limitPoints = true
-}) => {
+    limitPoints = true,
+    selectedHistoryPoint = null
+}, ref) => {
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
     const userInteractedRef = useRef<boolean>(false);
 
     const [isClient, setIsClient] = useState(false);
     useEffect(() => setIsClient(true), []);
+
+    // Expose map instance through ref
+    React.useImperativeHandle(ref, () => mapRef.current!, []);
+
+    // Efecto para centrar el mapa cuando se selecciona un punto del historial
+    useEffect(() => {
+        if (selectedHistoryPoint && mapRef.current) {
+            const { latitude, longitude } = selectedHistoryPoint;
+            if (typeof latitude === 'number' && typeof longitude === 'number' &&
+                !isNaN(latitude) && !isNaN(longitude) &&
+                latitude >= -90 && latitude <= 90 &&
+                longitude >= -180 && longitude <= 180) {
+                // Centrar el mapa en las coordenadas exactas del punto seleccionado
+                mapRef.current.setView([latitude, longitude], 16, { animate: true, duration: 0.5 });
+                
+                // Abrir popup en el marcador si existe
+                const markers = mapRef.current.eachLayer((layer: any) => {
+                    if (layer instanceof L.Marker) {
+                        const markerLatLng = layer.getLatLng();
+                        if (Math.abs(markerLatLng.lat - latitude) < 0.0001 && 
+                            Math.abs(markerLatLng.lng - longitude) < 0.0001) {
+                            layer.openPopup();
+                        }
+                    }
+                });
+            }
+        }
+    }, [selectedHistoryPoint]);
 
     // Función para obtener color según la velocidad
     const getSpeedColor = (speed: number) => {
@@ -371,6 +400,8 @@ export const RealtimeRouteMap: React.FC<RealtimeRouteMapProps> = ({
             )}
         </div>
     );
-};
+});
+
+RealtimeRouteMap.displayName = 'RealtimeRouteMap';
 
 
